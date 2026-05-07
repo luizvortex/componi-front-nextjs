@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html data-theme="dark" lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>New Component · Componi</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="tokens.css">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: var(--bg-canvas); color: var(--fg-primary); font-family: var(--font-ui); -webkit-font-smoothing: antialiased; height: 100%; overflow: hidden; }
+  button { font-family: inherit; cursor: pointer; }
+  a { text-decoration: none; color: inherit; }
+  *::-webkit-scrollbar { width: 5px; height: 5px; }
+  *::-webkit-scrollbar-track { background: transparent; }
+  *::-webkit-scrollbar-thumb { background: var(--border-subtle); border-radius: 4px; }
+  button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+  textarea:focus, input:focus { outline: none; box-shadow: 0 0 0 2px var(--accent); }
+  #root { height: 100%; display: flex; flex-direction: column; }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes progress-pulse {
+    0%   { opacity: 1; }
+    50%  { opacity: 0.4; }
+    100% { opacity: 1; }
+  }
+  @keyframes slide-in-bottom {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+
+<script type="text/babel">
+const { useState, useEffect, useRef, useCallback } = React;
+
+/* ─── TWEAK DEFAULTS ─── */
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "mode": "new",
+  "showBanner": true,
+  "splitRatio": 60,
+  "previewUpdating": true
+}/*EDITMODE-END*/;
+
+/* ─── ICONS ─── */
+const IC = {
+  logo: (size=18) => (
+    <div style={{display:"inline-flex",alignItems:"baseline",font:`600 ${size}px var(--font-ui)`,letterSpacing:"-0.04em",color:"var(--fg-primary)",userSelect:"none"}}>
+      compon<span style={{display:"inline-block",position:"relative"}}>i<span style={{position:"absolute",left:`${size*0.15}px`,top:`${size*0.15}px`,width:`${Math.max(4,size*0.2)}px`,height:`${Math.max(4,size*0.2)}px`,background:"var(--accent)",borderRadius:"1px"}}/></span>
+    </div>
+  ),
+  reload: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>,
+  x: <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
+  plus: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>,
+  warn: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>,
+  chevronDown: <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>,
+  hash: <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/><line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/></svg>,
+  home: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>,
+  spinner: (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" style={{animation:"spin 0.7s linear infinite",flexShrink:0}}>
+      <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" opacity="0.3"/>
+      <path d="M12 2v4" stroke="currentColor" opacity="1"/>
+    </svg>
+  ),
+};
+
+/* ─── Syntax-highlighted code lines ─── */
+const CODE_LINES = [
+  { tokens: [{ t:"import", c:"kw" }, { t:" React, { useState, useRef, useEffect } ", c:"plain" }, { t:"from", c:"kw" }, { t:' "react"', c:"str" }] },
+  { tokens: [] },
+  { tokens: [{ t:"interface", c:"kw" }, { t:" CommandPaletteProps {", c:"plain" }] },
+  { tokens: [{ t:"  placeholder", c:"plain" }, { t:"?:", c:"plain" }, { t:" string", c:"kw" }] },
+  { tokens: [{ t:"  commands", c:"plain" }, { t:":", c:"plain" }, { t:" Command", c:"type" }, { t:"[]", c:"plain" }] },
+  { tokens: [{ t:"  onSelect", c:"plain" }, { t:":", c:"plain" }, { t:" (cmd: ", c:"plain" }, { t:"Command", c:"type" }, { t:") => ", c:"plain" }, { t:"void", c:"kw" }] },
+  { tokens: [{ t:"}", c:"plain" }] },
+  { tokens: [] },
+  { tokens: [{ t:"export", c:"kw" }, { t:" ", c:"plain" }, { t:"function", c:"kw" }, { t:" CommandPalette", c:"type" }, { t:"({", c:"plain" }] },
+  { tokens: [{ t:"  placeholder = ", c:"plain" }, { t:'"Search commands…"', c:"str" }, { t:",", c:"plain" }] },
+  { tokens: [{ t:"  commands,", c:"plain" }] },
+  { tokens: [{ t:"  onSelect,", c:"plain" }] },
+  { tokens: [{ t:"}: CommandPaletteProps) {", c:"plain" }] },
+  { tokens: [{ t:"  ", c:"plain" }, { t:"// Track focused command index", c:"comment" }] },
+  { tokens: [{ t:"  const", c:"kw" }, { t:" [activeIdx, setActiveIdx] = ", c:"plain" }, { t:"useState", c:"type" }, { t:"(", c:"plain" }, { t:"0", c:"num" }, { t:")", c:"plain" }] },
+  { tokens: [{ t:"  const", c:"kw" }, { t:" [query, setQuery] = ", c:"plain" }, { t:"useState", c:"type" }, { t:"(", c:"plain" }, { t:'""', c:"str" }, { t:")", c:"plain" }] },
+  { tokens: [{ t:"  const", c:"kw" }, { t:" inputRef = ", c:"plain" }, { t:"useRef", c:"type" }, { t:"<HTMLInputElement>(", c:"plain" }, { t:"null", c:"kw" }, { t:")", c:"plain" }] },
+  { tokens: [] },
+  { tokens: [{ t:"  const", c:"kw" }, { t:" filtered = commands.", c:"plain" }, { t:"filter", c:"type" }, { t:"(cmd =>", c:"plain" }] },
+  { tokens: [{ t:"    cmd.label.", c:"plain" }, { t:"toLowerCase", c:"type" }, { t:"().", c:"plain" }, { t:"includes", c:"type" }, { t:"(query.", c:"plain" }, { t:"toLowerCase", c:"type" }, { t:"())", c:"plain" }] },
+  { tokens: [{ t:"  )", c:"plain" }] },
+  { tokens: [] },
+  { tokens: [{ t:"  useEffect", c:"type" }, { t:"(() => {", c:"plain" }] },
+  { tokens: [{ t:"    inputRef.current?.", c:"plain" }, { t:"focus", c:"type" }, { t:"()", c:"plain" }] },
+  { tokens: [{ t:"  }, [])", c:"plain" }] },
+  { tokens: [] },
+  { tokens: [{ t:"  return", c:"kw" }, { t:" (", c:"plain" }] },
+  { tokens: [{ t:"    <", c:"plain" }, { t:"div", c:"tag" }, { t:" className=", c:"plain" }, { t:'"cmd-palette"', c:"str" }, { t:">", c:"plain" }] },
+  { tokens: [{ t:"      <", c:"plain" }, { t:"input", c:"tag" }] },
+  { tokens: [{ t:"        ref=", c:"plain" }, { t:"{inputRef}", c:"expr" }] },
+  { tokens: [{ t:"        value=", c:"plain" }, { t:"{query}", c:"expr" }] },
+  { tokens: [{ t:"        onChange=", c:"plain" }, { t:"{e => ", c:"expr" }, { t:"setQuery", c:"type" }, { t:"(e.target.value)}", c:"expr" }] },
+  { tokens: [{ t:"        placeholder=", c:"plain" }, { t:"{placeholder}", c:"expr" }] },
+  { tokens: [{ t:"      />", c:"plain" }] },
+  { tokens: [{ t:"      <", c:"plain" }, { t:"ul", c:"tag" }, { t:" role=", c:"plain" }, { t:'"listbox"', c:"str" }, { t:">", c:"plain" }] },
+  { tokens: [{ t:"        {filtered.", c:"plain" }, { t:"map", c:"type" }, { t:"((cmd, i) => (", c:"plain" }] },
+  { tokens: [{ t:"          <", c:"plain" }, { t:"li", c:"tag" }] },
+  { tokens: [{ t:"            key=", c:"plain" }, { t:"{cmd.id}", c:"expr" }] },
+  { tokens: [{ t:"            aria-selected=", c:"plain" }, { t:"{i === activeIdx}", c:"expr" }] },
+  { tokens: [{ t:"            onClick=", c:"plain" }, { t:"{() => ", c:"expr" }, { t:"onSelect", c:"type" }, { t:"(cmd)}", c:"expr" }] },
+  { tokens: [{ t:"          >", c:"plain" }] },
+  { tokens: [{ t:"            {cmd.label}", c:"expr" }] },
+  { tokens: [{ t:"          </", c:"plain" }, { t:"li", c:"tag" }, { t:">", c:"plain" }] },
+  { tokens: [{ t:"        ))}", c:"plain" }] },
+  { tokens: [{ t:"      </", c:"plain" }, { t:"ul", c:"tag" }, { t:">", c:"plain" }] },
+  { tokens: [{ t:"    </", c:"plain" }, { t:"div", c:"tag" }, { t:">", c:"plain" }] },
+  { tokens: [{ t:"  )", c:"plain" }] },
+  { tokens: [{ t:"}", c:"plain" }] },
+];
+
+const TOKEN_COLORS = {
+  kw:      "var(--accent-hover)",
+  str:     "#34D399",
+  comment: "var(--fg-muted)",
+  type:    "#93C5FD",
+  tag:     "#F9A8D4",
+  expr:    "#FCD34D",
+  num:     "#FB923C",
+  plain:   "var(--fg-primary)",
+};
+
+function CodeLine({ lineNum, tokens, active }) {
+  return (
+    <div style={{
+      display:"flex", alignItems:"stretch", minHeight:20,
+      background: active ? "rgba(139,26,47,0.12)" : "transparent",
+      borderLeft: active ? "2px solid var(--accent)" : "2px solid transparent",
+    }}>
+      <span style={{
+        width:40, flexShrink:0, textAlign:"right", paddingRight:16,
+        font:`400 12px var(--font-mono)`, color:"var(--fg-muted)",
+        lineHeight:"20px", userSelect:"none",
+      }}>{lineNum}</span>
+      <span style={{font:`400 13px var(--font-mono)`, lineHeight:"20px", whiteSpace:"pre", flex:1}}>
+        {tokens.map((tk, i) => (
+          <span key={i} style={{color: TOKEN_COLORS[tk.c] || "var(--fg-primary)"}}>{tk.t}</span>
+        ))}
+      </span>
+    </div>
+  );
+}
+
+/* ─── Live Preview: Command Palette sketch ─── */
+function LivePreview() {
+  const [activeCmd, setActiveCmd] = useState(0);
+  const cmds = [
+    { label:"Go to file…",      kbd:"⌘P" },
+    { label:"Command Palette",  kbd:"⌘⇧P", active:true },
+    { label:"Open terminal",    kbd:"⌃`" },
+    { label:"Toggle sidebar",   kbd:"⌘B" },
+    { label:"Format document",  kbd:"⌥⇧F" },
+  ];
+  return (
+    <div style={{
+      width:"100%", height:"100%",
+      background:"radial-gradient(ellipse at 55% 35%, #1A1D24 0%, #0A0B0D 70%)",
+      display:"flex", alignItems:"center", justifyContent:"center",
+    }}>
+      <div style={{
+        width:"72%", maxWidth:360,
+        background:"#12141A",
+        border:"1px solid #2E323B",
+        borderRadius:10,
+        overflow:"hidden",
+        boxShadow:"0 24px 64px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.04)",
+      }}>
+        {/* Search row */}
+        <div style={{padding:"10px 14px", borderBottom:"1px solid #23262D", display:"flex", alignItems:"center", gap:8}}>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#71717A" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+          <div style={{flex:1, height:13, background:"transparent", display:"flex", alignItems:"center"}}>
+            <span style={{font:"400 12px 'Geist Mono',monospace", color:"#A1A1AA"}}>command palette</span>
+            <span style={{display:"inline-block", width:1, height:13, background:"var(--accent)", marginLeft:1, animation:"progress-pulse 1s ease-in-out infinite"}}/>
+          </div>
+          <span style={{font:"500 10px 'Geist Mono',monospace", color:"#71717A", padding:"2px 6px", background:"#1A1D24", borderRadius:4, border:"1px solid #23262D"}}>Esc</span>
+        </div>
+        {/* Results */}
+        {cmds.map((cmd, i) => (
+          <div
+            key={i}
+            onClick={() => setActiveCmd(i)}
+            style={{
+              padding:"8px 14px", display:"flex", alignItems:"center", gap:10,
+              background: i === activeCmd ? "rgba(139,26,47,0.18)" : "transparent",
+              borderLeft: i === activeCmd ? "2px solid #8B1A2F" : "2px solid transparent",
+              cursor:"pointer", transition:"background 0.1s",
+            }}
+          >
+            <div style={{width:6, height:6, borderRadius:"50%", background: i===activeCmd ? "#8B1A2F" : "#2E323B", flexShrink:0}}/>
+            <span style={{flex:1, font:"400 12px 'Geist Mono',monospace", color: i===activeCmd ? "#F5F5F7" : "#A1A1AA"}}>{cmd.label}</span>
+            <span style={{font:"500 10px 'Geist Mono',monospace", padding:"1px 6px", borderRadius:4, background:"#1A1D24", border:"1px solid #23262D", color:"#71717A", flexShrink:0}}>{cmd.kbd}</span>
+          </div>
+        ))}
+        {/* Footer */}
+        <div style={{padding:"7px 14px", borderTop:"1px solid #23262D", display:"flex", gap:14, alignItems:"center"}}>
+          {["↑↓  navigate", "⏎  select", "Esc  close"].map(k => (
+            <span key={k} style={{font:"400 10px 'Geist Mono',monospace", color:"#52525B"}}>{k}</span>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Top progress bar ─── */
+function ProgressBar({ active }) {
+  return (
+    <div style={{
+      position:"absolute", top:0, left:0, right:0, height:3,
+      background:"var(--bg-elevated)",
+      overflow:"hidden",
+      opacity: active ? 1 : 0,
+      transition:"opacity 0.2s",
+      zIndex:10,
+    }}>
+      <div style={{
+        position:"absolute", top:0, left:"-100%", width:"60%", height:"100%",
+        background:"var(--accent)",
+        animation: active ? "progress-slide 1.4s ease-in-out infinite" : "none",
+        boxShadow:"0 0 12px var(--accent)",
+      }}/>
+    </div>
+  );
+}
+
+/* ─── Main App ─── */
+function App() {
+  const [tweaks, setTweak] = useTweaks(TWEAK_DEFAULTS);
+
+  const mode         = tweaks.mode;           // "new" | "edit"
+  const showBanner   = tweaks.showBanner;
+  const previewUpdating = tweaks.previewUpdating;
+
+  const [name, setName]       = useState("CommandPalette");
+  const [framework, setFW]    = useState("React");
+  const [tags, setTags]       = useState(["search","modal"]);
+  const [isPublic, setPublic] = useState(true);
+  const [bannerDismissed, setBannerDismissed] = useState(false);
+  const [changelog, setChangelog] = useState("");
+  const [splitPct, setSplitPct]   = useState(tweaks.splitRatio);
+
+  // Sync split ratio from tweaks
+  useEffect(() => { setSplitPct(tweaks.splitRatio); }, [tweaks.splitRatio]);
+
+  /* drag resize */
+  const dragging = useRef(false);
+  const containerRef = useRef(null);
+  const onHandleDown = useCallback((e) => {
+    e.preventDefault();
+    dragging.current = true;
+    const onMove = (e) => {
+      if (!dragging.current || !containerRef.current) return;
+      const rect = containerRef.current.getBoundingClientRect();
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const pct = ((clientX - rect.left) / rect.width) * 100;
+      setSplitPct(Math.min(75, Math.max(30, pct)));
+    };
+    const onUp = () => { dragging.current = false; document.removeEventListener("mousemove", onMove); document.removeEventListener("mouseup", onUp); };
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+  }, []);
+
+  const showBannerFinal = showBanner && !bannerDismissed && mode === "new";
+  const isEdit = mode === "edit";
+
+  return (
+    <div style={{height:"100vh", display:"flex", flexDirection:"column", background:"var(--bg-canvas)", overflow:"hidden"}}>
+
+      {/* ── TOP BAR ── */}
+      <header style={{
+        height:48, flexShrink:0,
+        display:"flex", alignItems:"center", gap:12,
+        padding:"0 16px",
+        borderBottom:"1px solid var(--border-subtle)",
+        background:"var(--bg-canvas)",
+        zIndex:30,
+      }}>
+        {/* Logo + breadcrumb */}
+        <div style={{display:"flex", alignItems:"center", gap:8}}>
+          {IC.logo(17)}
+          <span style={{color:"var(--border-strong)", fontSize:14}}>/</span>
+          <span style={{font:"400 13px var(--font-ui)", color:"var(--fg-muted)"}}>yourhandle</span>
+          <span style={{color:"var(--border-strong)", fontSize:14}}>/</span>
+          <span style={{font:"500 13px var(--font-ui)", color:"var(--fg-secondary)"}}>
+            {isEdit ? "command-palette" : "new component"}
+          </span>
+          {isEdit && (
+            <span style={{
+              padding:"1px 7px", borderRadius:4,
+              font:"600 11px var(--font-mono)",
+              background:"var(--bg-elevated)",
+              color:"var(--fg-muted)",
+              border:"1px solid var(--border-subtle)",
+            }}>v2</span>
+          )}
+        </div>
+
+        <div style={{flex:1}}/>
+
+        {/* Right actions */}
+        <div style={{display:"flex", alignItems:"center", gap:8}}>
+          <button style={{
+            height:32, padding:"0 14px", borderRadius:6,
+            background:"transparent",
+            border:"1px solid var(--border-strong)",
+            color:"var(--fg-secondary)",
+            font:"500 13px var(--font-ui)",
+            transition:"border-color 0.12s, color 0.12s",
+          }}
+            onMouseEnter={e=>{ e.currentTarget.style.borderColor="var(--fg-muted)"; e.currentTarget.style.color="var(--fg-primary)"; }}
+            onMouseLeave={e=>{ e.currentTarget.style.borderColor="var(--border-strong)"; e.currentTarget.style.color="var(--fg-secondary)"; }}
+          >Save draft</button>
+          <button style={{
+            height:32, padding:"0 16px", borderRadius:6,
+            background:"var(--accent)",
+            border:"none",
+            color:"#fff",
+            font:"600 13px var(--font-ui)",
+            opacity: name.trim() ? 1 : 0.45,
+            cursor: name.trim() ? "pointer" : "not-allowed",
+            transition:"background 0.12s, opacity 0.12s",
+            display:"flex", alignItems:"center", gap:6,
+          }}
+            onMouseEnter={e=>{ if(name.trim()) e.currentTarget.style.background="var(--accent-hover)"; }}
+            onMouseLeave={e=>{ e.currentTarget.style.background="var(--accent)"; }}
+          >
+            {isEdit ? "Update →" : "Publish →"}
+          </button>
+        </div>
+      </header>
+
+      {/* ── SPLIT PANE ── */}
+      <div ref={containerRef} style={{
+        flex:1, display:"flex", overflow:"hidden",
+        position:"relative",
+      }}>
+
+        {/* LEFT: Editor */}
+        <div style={{
+          width:`${splitPct}%`, flexShrink:0,
+          display:"flex", flexDirection:"column",
+          borderRight:"1px solid var(--border-subtle)",
+          overflow:"hidden",
+          background:"var(--bg-canvas)",
+        }}>
+          {/* Editor header */}
+          <div style={{
+            height:36, flexShrink:0,
+            display:"flex", alignItems:"center", gap:8,
+            padding:"0 12px 0 0",
+            borderBottom:"1px solid var(--border-subtle)",
+            background:"var(--bg-surface)",
+          }}>
+            {/* File tab */}
+            <div style={{
+              height:"100%",
+              display:"flex", alignItems:"center", gap:8,
+              padding:"0 14px",
+              borderRight:"1px solid var(--border-subtle)",
+              background:"var(--bg-canvas)",
+              borderBottom:"2px solid var(--accent)",
+            }}>
+              <span style={{font:"400 13px var(--font-mono)", color:"var(--fg-secondary)"}}>App.tsx</span>
+              <span style={{
+                padding:"1px 6px", borderRadius:3,
+                font:"500 11px var(--font-mono)",
+                background:"var(--bg-elevated)",
+                color:"var(--fg-muted)",
+                border:"1px solid var(--border-subtle)",
+              }}>TSX</span>
+            </div>
+            <div style={{flex:1}}/>
+            {/* Minimap lines (decorative) */}
+            <div style={{display:"flex", flexDirection:"column", gap:1.5, opacity:0.3, width:20, flexShrink:0}}>
+              {[100,60,80,40,90,55,70,45].map((w,i)=>(
+                <div key={i} style={{height:1.5, width:`${w}%`, background:"var(--fg-muted)", borderRadius:1}}/>
+              ))}
+            </div>
+          </div>
+
+          {/* Code area */}
+          <div style={{
+            flex:1, overflowY:"auto", overflowX:"auto",
+            padding:"10px 0",
+            background:"var(--bg-canvas)",
+          }}>
+            {CODE_LINES.map((line, i) => (
+              <CodeLine
+                key={i}
+                lineNum={i + 1}
+                tokens={line.tokens}
+                active={i === 14 || i === 15}
+              />
+            ))}
+          </div>
+        </div>
+
+        {/* RESIZE HANDLE */}
+        <div
+          onMouseDown={onHandleDown}
+          style={{
+            width:4, flexShrink:0,
+            background:"var(--border-subtle)",
+            cursor:"col-resize",
+            transition:"background 0.12s",
+            position:"relative", zIndex:5,
+            userSelect:"none",
+          }}
+          onMouseEnter={e=>e.currentTarget.style.background="rgba(139,26,47,0.35)"}
+          onMouseLeave={e=>e.currentTarget.style.background="var(--border-subtle)"}
+        />
+
+        {/* RIGHT: Preview */}
+        <div style={{
+          flex:1, display:"flex", flexDirection:"column",
+          overflow:"hidden",
+          background:"var(--bg-surface)",
+        }}>
+          {/* Preview header */}
+          <div style={{
+            height:36, flexShrink:0,
+            display:"flex", alignItems:"center", gap:8,
+            padding:"0 14px",
+            borderBottom:"1px solid var(--border-subtle)",
+            background:"var(--bg-surface)",
+            position:"relative",
+          }}>
+            <ProgressBar active={previewUpdating} />
+            <span style={{font:"500 13px var(--font-ui)", color:"var(--fg-muted)"}}>Preview</span>
+            {previewUpdating && (
+              <span style={{color:"var(--fg-muted)", display:"inline-flex"}}>{IC.spinner}</span>
+            )}
+            <div style={{flex:1}}/>
+            <button style={{
+              height:26, padding:"0 10px", borderRadius:5,
+              background:"transparent",
+              border:"1px solid var(--border-subtle)",
+              color:"var(--fg-muted)",
+              font:"500 12px var(--font-ui)",
+              display:"flex", alignItems:"center", gap:5,
+              transition:"border-color 0.12s, color 0.12s",
+            }}
+              onMouseEnter={e=>{ e.currentTarget.style.borderColor="var(--border-strong)"; e.currentTarget.style.color="var(--fg-secondary)"; }}
+              onMouseLeave={e=>{ e.currentTarget.style.borderColor="var(--border-subtle)"; e.currentTarget.style.color="var(--fg-muted)"; }}
+            >
+              {React.cloneElement(IC.reload, {width:12, height:12})}
+              Reload
+            </button>
+          </div>
+
+          {/* Preview content */}
+          <div style={{
+            flex:1, padding:12, overflow:"hidden",
+            display:"flex", flexDirection:"column",
+          }}>
+            <div style={{
+              flex:1,
+              background:"var(--bg-elevated)",
+              borderRadius:8,
+              overflow:"hidden",
+              border:"1px solid var(--border-subtle)",
+              position:"relative",
+            }}>
+              <LivePreview />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── CHANGELOG (edit mode only) ── */}
+      {isEdit && (
+        <div style={{
+          flexShrink:0,
+          padding:"10px 16px",
+          borderTop:"1px solid var(--border-subtle)",
+          background:"var(--bg-surface)",
+          animation:"slide-in-bottom 0.18s ease-out",
+        }}>
+          <textarea
+            value={changelog}
+            onChange={e => setChangelog(e.target.value)}
+            placeholder="What changed in v2?"
+            style={{
+              width:"100%", height:64,
+              background:"var(--bg-elevated)",
+              border:"1px solid var(--border-subtle)",
+              borderRadius:6,
+              padding:"8px 12px",
+              font:"400 13px var(--font-ui)",
+              color:"var(--fg-primary)",
+              resize:"none",
+              lineHeight:1.5,
+              transition:"border-color 0.12s",
+            }}
+            onFocus={e => e.currentTarget.style.borderColor="var(--accent)"}
+            onBlur={e => e.currentTarget.style.borderColor="var(--border-subtle)"}
+          />
+        </div>
+      )}
+
+      {/* ── VALIDATION BANNER ── */}
+      {showBannerFinal && (
+        <div style={{
+          flexShrink:0,
+          display:"flex", alignItems:"center", gap:8,
+          padding:"8px 16px",
+          borderTop:"1px solid rgba(245,158,11,0.3)",
+          background:"rgba(245,158,11,0.08)",
+          animation:"slide-in-bottom 0.18s ease-out",
+        }}>
+          <span style={{color:"var(--warn)", display:"inline-flex", flexShrink:0}}>{IC.warn}</span>
+          <span style={{font:"400 13px var(--font-ui)", color:"var(--fg-secondary)", flex:1, minWidth:0}}>
+            3 dependencies have unpinned versions —{" "}
+            <span style={{
+              color:"var(--accent-hover)",
+              textDecoration:"underline",
+              cursor:"pointer",
+              textUnderlineOffset:2,
+            }}>publish anyway?</span>
+          </span>
+          <button
+            onClick={() => setBannerDismissed(true)}
+            style={{
+              width:24, height:24, borderRadius:4, border:"none",
+              background:"transparent",
+              color:"var(--fg-muted)",
+              display:"inline-flex", alignItems:"center", justifyContent:"center",
+              flexShrink:0, transition:"color 0.12s, background 0.12s",
+            }}
+            onMouseEnter={e=>{ e.currentTarget.style.background="var(--bg-elevated)"; e.currentTarget.style.color="var(--fg-primary)"; }}
+            onMouseLeave={e=>{ e.currentTarget.style.background="transparent"; e.currentTarget.style.color="var(--fg-muted)"; }}
+          >{IC.x}</button>
+        </div>
+      )}
+
+      {/* ── BOTTOM BAR ── */}
+      <div style={{
+        height:56, flexShrink:0,
+        display:"flex", alignItems:"center", gap:8,
+        padding:"0 16px",
+        borderTop:"1px solid var(--border-subtle)",
+        background:"var(--bg-surface)",
+      }}>
+
+        {/* Name input */}
+        <input
+          value={name}
+          onChange={e => setName(e.target.value)}
+          placeholder="Component name…"
+          style={{
+            width:180, height:32, flexShrink:0,
+            background:"var(--bg-elevated)",
+            border:"1px solid var(--border-subtle)",
+            borderRadius:6,
+            padding:"0 10px",
+            font:"400 13px var(--font-ui)",
+            color:"var(--fg-primary)",
+            transition:"border-color 0.12s",
+          }}
+          onFocus={e => e.currentTarget.style.borderColor="var(--accent)"}
+          onBlur={e => e.currentTarget.style.borderColor="var(--border-subtle)"}
+        />
+
+        {/* Framework dropdown */}
+        <div style={{
+          position:"relative", flexShrink:0,
+        }}>
+          <select
+            value={framework}
+            onChange={e => setFW(e.target.value)}
+            style={{
+              height:32, padding:"0 28px 0 10px",
+              background:"var(--bg-elevated)",
+              border:"1px solid var(--border-subtle)",
+              borderRadius:6,
+              font:"400 13px var(--font-ui)",
+              color:"var(--fg-secondary)",
+              appearance:"none", WebkitAppearance:"none",
+              cursor:"pointer",
+              transition:"border-color 0.12s",
+            }}
+            onFocus={e => e.currentTarget.style.borderColor="var(--accent)"}
+            onBlur={e => e.currentTarget.style.borderColor="var(--border-subtle)"}
+          >
+            {["React","Vue","Svelte","Angular","Solid"].map(fw => (
+              <option key={fw} value={fw}>{fw}</option>
+            ))}
+          </select>
+          <span style={{
+            position:"absolute", right:8, top:"50%", transform:"translateY(-50%)",
+            color:"var(--fg-muted)", pointerEvents:"none",
+          }}>{IC.chevronDown}</span>
+        </div>
+
+        {/* Tags */}
+        <div style={{display:"flex", alignItems:"center", gap:6, minWidth:0}}>
+          {/* Add tags pill */}
+          <button style={{
+            height:28, padding:"0 10px",
+            display:"inline-flex", alignItems:"center", gap:5,
+            background:"transparent",
+            border:"1px dashed var(--border-strong)",
+            borderRadius:999,
+            font:"500 12px var(--font-ui)",
+            color:"var(--fg-muted)",
+            flexShrink:0,
+            transition:"border-color 0.12s, color 0.12s",
+          }}
+            onMouseEnter={e=>{ e.currentTarget.style.borderColor="var(--fg-muted)"; e.currentTarget.style.color="var(--fg-secondary)"; }}
+            onMouseLeave={e=>{ e.currentTarget.style.borderColor="var(--border-strong)"; e.currentTarget.style.color="var(--fg-muted)"; }}
+          >
+            {IC.plus}<span>Add tag</span>
+          </button>
+
+          {/* Existing tag chips */}
+          {tags.map(tag => (
+            <span key={tag} style={{
+              display:"inline-flex", alignItems:"center", gap:5,
+              height:26, padding:"0 8px 0 9px",
+              background:"var(--bg-elevated)",
+              border:"1px solid var(--border-subtle)",
+              borderRadius:999,
+              font:"500 12px var(--font-mono)",
+              color:"var(--fg-secondary)",
+              flexShrink:0,
+            }}>
+              <span style={{color:"var(--accent)", opacity:0.7, display:"inline-flex"}}>{IC.hash}</span>
+              {tag}
+              <button
+                onClick={() => setTags(t => t.filter(x => x !== tag))}
+                style={{
+                  display:"inline-flex", alignItems:"center", justifyContent:"center",
+                  width:14, height:14, borderRadius:"50%",
+                  background:"transparent", border:"none",
+                  color:"var(--fg-muted)", padding:0,
+                  cursor:"pointer",
+                  transition:"color 0.1s",
+                }}
+                onMouseEnter={e => e.currentTarget.style.color="var(--fg-primary)"}
+                onMouseLeave={e => e.currentTarget.style.color="var(--fg-muted)"}
+              >{IC.x}</button>
+            </span>
+          ))}
+        </div>
+
+        <div style={{flex:1}}/>
+
+        {/* Version badge (edit mode) */}
+        {isEdit && (
+          <span style={{
+            padding:"3px 9px", borderRadius:5,
+            font:"600 12px var(--font-mono)",
+            background:"var(--bg-elevated)",
+            color:"var(--fg-muted)",
+            border:"1px solid var(--border-subtle)",
+            flexShrink:0,
+          }}>v2</span>
+        )}
+
+        {/* Public toggle */}
+        <div style={{display:"flex", alignItems:"center", gap:8, flexShrink:0}}>
+          <span style={{font:"500 12px var(--font-ui)", color:"var(--fg-secondary)"}}>Public</span>
+          <div
+            onClick={() => setPublic(v => !v)}
+            style={{
+              width:36, height:20, borderRadius:999,
+              background: isPublic ? "var(--accent)" : "var(--bg-elevated)",
+              border: `1px solid ${isPublic ? "var(--accent)" : "var(--border-strong)"}`,
+              position:"relative", cursor:"pointer",
+              transition:"background 0.15s, border-color 0.15s",
+            }}
+          >
+            <div style={{
+              position:"absolute",
+              top:2, left: isPublic ? 17 : 2,
+              width:14, height:14, borderRadius:"50%",
+              background:"#fff",
+              transition:"left 0.15s cubic-bezier(0.34,1.56,0.64,1)",
+              boxShadow:"0 1px 3px rgba(0,0,0,0.3)",
+            }}/>
+          </div>
+        </div>
+
+        {/* Publish button */}
+        <button style={{
+          height:34, padding:"0 18px", borderRadius:6,
+          background: "var(--accent)",
+          border:"none",
+          color:"#fff",
+          font:"600 13px var(--font-ui)",
+          opacity: name.trim() ? 1 : 0.45,
+          cursor: name.trim() ? "pointer" : "not-allowed",
+          transition:"background 0.12s, opacity 0.12s",
+          flexShrink:0,
+        }}
+          onMouseEnter={e=>{ if(name.trim()) e.currentTarget.style.background="var(--accent-hover)"; }}
+          onMouseLeave={e=>{ e.currentTarget.style.background="var(--accent)"; }}
+        >
+          {isEdit ? "Update →" : "Publish →"}
+        </button>
+      </div>
+
+      {/* ── TWEAKS PANEL ── */}
+      <TweaksPanel>
+        <TweakSection label="Mode">
+          <TweakRadio id="mode" options={["new","edit"]} value={tweaks.mode} onChange={v => setTweak("mode", v)} />
+        </TweakSection>
+        <TweakSection label="Validation Banner">
+          <TweakToggle id="showBanner" label="Show warning banner" value={tweaks.showBanner} onChange={v => { setTweak("showBanner", v); setBannerDismissed(false); }} />
+        </TweakSection>
+        <TweakSection label="Preview State">
+          <TweakToggle id="previewUpdating" label="Loading / debounce active" value={tweaks.previewUpdating} onChange={v => setTweak("previewUpdating", v)} />
+        </TweakSection>
+        <TweakSection label="Split Ratio">
+          <TweakSlider id="splitRatio" label="Editor width %" min={30} max={75} step={1} value={tweaks.splitRatio} onChange={v => setTweak("splitRatio", v)} />
+        </TweakSection>
+      </TweaksPanel>
+
+    </div>
+  );
+}
+
+/* ─── Progress bar keyframe ─── */
+const styleEl = document.createElement("style");
+styleEl.textContent = `
+@keyframes progress-slide {
+  0%   { left: -60%; }
+  100% { left: 110%; }
+}
+`;
+document.head.appendChild(styleEl);
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>

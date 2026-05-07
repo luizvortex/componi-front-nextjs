@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html data-theme="dark" lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Settings · Componi</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="tokens.css">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: var(--bg-canvas); color: var(--fg-primary);
+    font-family: var(--font-ui); -webkit-font-smoothing: antialiased;
+    min-height: 100%;
+  }
+  button { font-family: inherit; cursor: pointer; }
+  input, textarea { font-family: inherit; }
+  a { text-decoration: none; color: inherit; }
+  *::-webkit-scrollbar { width: 5px; height: 5px; }
+  *::-webkit-scrollbar-track { background: transparent; }
+  *::-webkit-scrollbar-thumb { background: var(--border-subtle); border-radius: 4px; }
+  button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+  input:focus-visible, textarea:focus-visible {
+    outline: none;
+    border-color: var(--accent) !important;
+    box-shadow: 0 0 0 3px rgba(139, 26, 47, 0.18);
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+
+<script type="text/babel">
+const { useState, useEffect, useRef } = React;
+
+/* ─── TWEAK DEFAULTS ─── */
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "theme": "dark",
+  "activeSection": "profile",
+  "appearanceMode": "dark"
+}/*EDITMODE-END*/;
+
+/* ─── Helpers ─── */
+const AV_PALETTE = ["#A31F37","#4F46E5","#0EA5E9","#10B981","#D97706","#7C3AED","#DB2777","#059669"];
+function avColor(n=""){ let h=0; for(let i=0;i<n.length;i++) h=(h*31+n.charCodeAt(i))>>>0; return AV_PALETTE[h%AV_PALETTE.length]; }
+
+/* ─── Logo ─── */
+function Logo({ size=18 }) {
+  return (
+    <div style={{display:"inline-flex",alignItems:"baseline",font:`600 ${size}px var(--font-ui)`,letterSpacing:"-0.04em",color:"var(--fg-primary)",userSelect:"none"}}>
+      compon<span style={{display:"inline-block",position:"relative"}}>i
+        <span style={{position:"absolute",left:`${size*0.15}px`,top:`${size*0.15}px`,width:`${Math.max(4,size*0.2)}px`,height:`${Math.max(4,size*0.2)}px`,background:"var(--accent)",borderRadius:"1px"}}></span>
+      </span>
+    </div>
+  );
+}
+
+/* ─── Avatar ─── */
+function Av({ name="?", size=36 }) {
+  const c = avColor(name);
+  return (
+    <div style={{
+      width:size, height:size, borderRadius:"50%", flexShrink:0,
+      background:`linear-gradient(135deg,${c} 0%,rgba(0,0,0,0.38) 100%)`,
+      display:"inline-flex", alignItems:"center", justifyContent:"center",
+      color:"#fff", font:`600 ${Math.round(size*0.42)}px var(--font-ui)`,
+    }}>{name[0]?.toUpperCase()}</div>
+  );
+}
+
+/* ─── Icons ─── */
+const IC = {
+  search:   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>,
+  bell:     <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>,
+  sun:      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>,
+  moon:     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>,
+  monitor:  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>,
+  upload:   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>,
+  plus:     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>,
+  chevronRight: <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>,
+};
+
+/* ─── Sticky Top Bar (matches Home/Explore pattern) ─── */
+function TopBar() {
+  return (
+    <header style={{
+      position:"sticky", top:0, zIndex:30,
+      height:56,
+      display:"flex", alignItems:"center",
+      padding:"0 24px", gap:16,
+      background:"rgba(10,11,13,0.78)",
+      borderBottom:"1px solid var(--border-subtle)",
+      backdropFilter:"blur(10px)",
+      WebkitBackdropFilter:"blur(10px)",
+    }}>
+      <Logo size={18} />
+
+      {/* breadcrumb */}
+      <div style={{display:"flex",alignItems:"center",gap:8,marginLeft:4,minWidth:0}}>
+        <span style={{color:"var(--border-strong)",font:"400 13px var(--font-ui)"}}>/</span>
+        <span style={{font:"500 13px var(--font-ui)",color:"var(--fg-secondary)"}}>Settings</span>
+      </div>
+
+      <div style={{flex:1}}></div>
+
+      {/* Search */}
+      <div style={{
+        display:"flex",alignItems:"center",gap:8,
+        height:32,padding:"0 12px",
+        background:"var(--bg-elevated)",
+        border:"1px solid var(--border-subtle)",
+        borderRadius:6,
+        cursor:"pointer", width:240,
+        color:"var(--fg-muted)",
+      }}>
+        {IC.search}
+        <span style={{font:"400 13px var(--font-ui)",color:"var(--fg-muted)",flex:1}}>Search settings…</span>
+        <span style={{font:"500 11px var(--font-mono)",padding:"1px 5px",borderRadius:3,background:"var(--bg-canvas)",border:"1px solid var(--border-strong)",color:"var(--fg-muted)",lineHeight:1.4}}>⌘K</span>
+      </div>
+
+      {/* New component */}
+      <button style={{
+        display:"flex",alignItems:"center",gap:6,
+        height:32,padding:"0 12px",
+        background:"var(--accent)",color:"#fff",border:"none",
+        borderRadius:6,
+        font:"600 13px var(--font-ui)",
+        transition:"background 0.12s",
+      }}
+        onMouseEnter={e=>e.currentTarget.style.background="var(--accent-hover)"}
+        onMouseLeave={e=>e.currentTarget.style.background="var(--accent)"}
+      >
+        {IC.plus} New
+      </button>
+
+      {/* Icon buttons */}
+      <button style={{
+        width:32,height:32,borderRadius:6,
+        background:"transparent",border:"none",
+        color:"var(--fg-secondary)",
+        display:"inline-flex",alignItems:"center",justifyContent:"center",
+        transition:"background 0.12s,color 0.12s",
+      }}
+        onMouseEnter={e=>{e.currentTarget.style.background="var(--bg-elevated)";e.currentTarget.style.color="var(--fg-primary)";}}
+        onMouseLeave={e=>{e.currentTarget.style.background="transparent";e.currentTarget.style.color="var(--fg-secondary)";}}
+      >
+        {IC.bell}
+      </button>
+
+      <Av name="Luiz" size={28}/>
+    </header>
+  );
+}
+
+/* ─── Settings Nav Data ─── */
+const NAV_GROUPS = [
+  { label:"Account", items:[
+    { k:"profile", label:"Profile" },
+    { k:"account", label:"Account" },
+    { k:"privacy", label:"Privacy" },
+  ]},
+  { label:"Preferences", items:[
+    { k:"appearance", label:"Appearance" },
+    { k:"notifications", label:"Notifications" },
+  ]},
+  { label:"Safety", items:[
+    { k:"blocked", label:"Blocked users" },
+    { k:"muted", label:"Muted users" },
+  ]},
+  { label:"Legal", items:[
+    { k:"export", label:"Data export" },
+    { k:"delete", label:"Delete account", danger:true },
+  ]},
+];
+
+/* ─── Left Nav ─── */
+function SettingsNav({ active, setActive }) {
+  return (
+    <aside style={{
+      width:200, flexShrink:0,
+      position:"sticky", top:72,
+      alignSelf:"flex-start",
+    }}>
+      <div style={{
+        background:"var(--bg-surface)",
+        border:"1px solid var(--border-subtle)",
+        borderRadius:8,
+        padding:8,
+        display:"flex", flexDirection:"column", gap:14,
+      }}>
+        {NAV_GROUPS.map(group=>(
+          <div key={group.label} style={{display:"flex",flexDirection:"column",gap:2}}>
+            <div style={{
+              padding:"4px 8px 4px",
+              font:"600 11px var(--font-ui)",
+              letterSpacing:"0.08em",
+              textTransform:"uppercase",
+              color:"var(--fg-muted)",
+              marginBottom:2,
+            }}>{group.label}</div>
+            {group.items.map(it=>{
+              const isActive = active === it.k;
+              return (
+                <button key={it.k} onClick={()=>setActive(it.k)} style={{
+                  position:"relative",
+                  display:"flex",alignItems:"center",
+                  height:32,padding: isActive ? "0 8px 0 10px" : "0 8px",
+                  borderRadius:6,
+                  background:isActive?"var(--bg-elevated)":"transparent",
+                  border:"none", textAlign:"left",
+                  color: it.danger
+                    ? (isActive ? "var(--danger)" : "var(--fg-secondary)")
+                    : (isActive ? "var(--fg-primary)" : "var(--fg-secondary)"),
+                  font:`${isActive?"600":"500"} 13px var(--font-ui)`,
+                  transition:"background 0.12s,color 0.12s",
+                  cursor:"pointer",
+                }}
+                  onMouseEnter={e=>{ if(!isActive){ e.currentTarget.style.background="var(--bg-elevated)"; e.currentTarget.style.color = it.danger ? "var(--danger)" : "var(--fg-primary)"; }}}
+                  onMouseLeave={e=>{ if(!isActive){ e.currentTarget.style.background="transparent"; e.currentTarget.style.color = "var(--fg-secondary)"; }}}
+                >
+                  {isActive && (
+                    <span style={{
+                      position:"absolute", left:0, top:6, bottom:6,
+                      width:2, borderRadius:1,
+                      background: it.danger ? "var(--danger)" : "var(--accent)",
+                    }}></span>
+                  )}
+                  <span>{it.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        ))}
+      </div>
+    </aside>
+  );
+}
+
+/* ─── Form primitives ─── */
+function Field({ label, hint, children, right }) {
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:6}}>
+      <div style={{display:"flex",alignItems:"baseline",justifyContent:"space-between",gap:8}}>
+        <label style={{font:"500 13px var(--font-ui)",color:"var(--fg-secondary)"}}>{label}</label>
+        {right}
+      </div>
+      {children}
+      {hint && <div style={{font:"400 12px var(--font-ui)",color:"var(--fg-muted)"}}>{hint}</div>}
+    </div>
+  );
+}
+
+const inputStyle = {
+  width:"100%", height:36,
+  padding:"0 12px",
+  background:"var(--bg-elevated)",
+  border:"1px solid var(--border-subtle)",
+  borderRadius:6,
+  color:"var(--fg-primary)",
+  font:"400 13px var(--font-ui)",
+  transition:"border-color 0.12s, box-shadow 0.12s",
+  outline:"none",
+};
+
+function TextInput({ value, onChange, placeholder, prefix }) {
+  if (prefix) {
+    return (
+      <div style={{
+        display:"flex",alignItems:"center",
+        height:36,
+        background:"var(--bg-elevated)",
+        border:"1px solid var(--border-subtle)",
+        borderRadius:6,
+        transition:"border-color 0.12s, box-shadow 0.12s",
+      }}
+        onFocus={e=>{e.currentTarget.style.borderColor="var(--accent)"; e.currentTarget.style.boxShadow="0 0 0 3px rgba(139,26,47,0.18)";}}
+        onBlur={e=>{e.currentTarget.style.borderColor="var(--border-subtle)"; e.currentTarget.style.boxShadow="none";}}
+      >
+        <span style={{
+          paddingLeft:12, paddingRight:0,
+          font:"400 13px var(--font-mono)",
+          color:"var(--fg-muted)",
+          userSelect:"none",
+        }}>{prefix}</span>
+        <input
+          value={value}
+          onChange={e=>onChange?.(e.target.value)}
+          placeholder={placeholder}
+          style={{
+            flex:1, height:"100%",
+            padding:"0 12px 0 2px",
+            background:"transparent", border:"none", outline:"none",
+            color:"var(--fg-primary)",
+            font:"400 13px var(--font-mono)",
+          }}
+        />
+      </div>
+    );
+  }
+  return (
+    <input
+      value={value}
+      onChange={e=>onChange?.(e.target.value)}
+      placeholder={placeholder}
+      style={inputStyle}
+    />
+  );
+}
+
+/* ─── Section Header ─── */
+function SectionHeader({ title, subtitle }) {
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:4,marginBottom:24}}>
+      <h2 style={{font:"700 20px var(--font-ui)",color:"var(--fg-primary)",letterSpacing:"-0.01em"}}>{title}</h2>
+      {subtitle && <div style={{font:"400 14px var(--font-ui)",color:"var(--fg-muted)"}}>{subtitle}</div>}
+    </div>
+  );
+}
+
+/* ─── Avatar Upload ─── */
+function AvatarUpload() {
+  return (
+    <div style={{display:"flex",alignItems:"center",gap:16,marginBottom:28}}>
+      <div style={{position:"relative"}}>
+        <Av name="Luiz" size={72}/>
+      </div>
+      <div style={{display:"flex",alignItems:"center",gap:14}}>
+        <button style={{
+          display:"inline-flex",alignItems:"center",gap:6,
+          height:32,padding:"0 12px",
+          background:"transparent",
+          border:"1px solid var(--border-strong)",
+          borderRadius:6,
+          color:"var(--fg-primary)",
+          font:"500 13px var(--font-ui)",
+          transition:"background 0.12s, border-color 0.12s",
+        }}
+          onMouseEnter={e=>{e.currentTarget.style.background="var(--bg-elevated)";}}
+          onMouseLeave={e=>{e.currentTarget.style.background="transparent";}}
+        >
+          {IC.upload}
+          Change avatar
+        </button>
+        <button style={{
+          background:"transparent",border:"none",
+          font:"500 13px var(--font-ui)",
+          color:"var(--danger)",
+          padding:"4px 2px",
+          transition:"opacity 0.12s",
+        }}
+          onMouseEnter={e=>e.currentTarget.style.opacity="0.75"}
+          onMouseLeave={e=>e.currentTarget.style.opacity="1"}
+        >
+          Remove
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Segmented Control (theme) ─── */
+function Segmented({ value, onChange, options }) {
+  return (
+    <div role="tablist" style={{
+      display:"inline-flex",
+      padding:3,
+      background:"var(--bg-surface)",
+      border:"1px solid var(--border-subtle)",
+      borderRadius:8,
+      gap:2,
+    }}>
+      {options.map(opt=>{
+        const active = value === opt.k;
+        return (
+          <button key={opt.k} role="tab" aria-selected={active} onClick={()=>onChange?.(opt.k)} style={{
+            display:"inline-flex",alignItems:"center",gap:6,
+            height:30, padding:"0 14px",
+            background: active ? "var(--bg-elevated)" : "transparent",
+            border: active ? "1px solid var(--border-strong)" : "1px solid transparent",
+            borderRadius:6,
+            color: active ? "var(--fg-primary)" : "var(--fg-secondary)",
+            font:`${active?"600":"500"} 13px var(--font-ui)`,
+            transition:"background 0.12s, color 0.12s, border-color 0.12s",
+            cursor:"pointer",
+          }}
+            onMouseEnter={e=>{ if(!active){ e.currentTarget.style.color="var(--fg-primary)"; }}}
+            onMouseLeave={e=>{ if(!active){ e.currentTarget.style.color="var(--fg-secondary)"; }}}
+          >
+            {opt.icon}
+            {opt.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ─── Profile Settings ─── */
+function ProfileSettings() {
+  const [displayName, setDisplayName] = useState("Luiz Almeida");
+  const [username, setUsername] = useState("luiz");
+  const [pronouns, setPronouns] = useState("");
+  const [bio, setBio] = useState("Designer & frontend dev. Building small, sharp components.");
+  const [website, setWebsite] = useState("luiz.studio");
+  const [github, setGithub] = useState("luizalmeida");
+
+  const charLimit = 160;
+  const charCount = bio.length;
+  const charNear = charCount > charLimit * 0.85;
+  const charOver = charCount > charLimit;
+
+  return (
+    <div style={{display:"flex",flexDirection:"column"}}>
+      {/* PROFILE */}
+      <SectionHeader title="Profile" subtitle="How others see you on Componi." />
+      <AvatarUpload />
+
+      <div style={{display:"flex",flexDirection:"column",gap:16}}>
+        <Field label="Display name">
+          <TextInput value={displayName} onChange={setDisplayName} />
+        </Field>
+
+        <Field label="Username" hint="componi.dev/@luiz">
+          <TextInput value={username} onChange={setUsername} prefix="@" />
+        </Field>
+
+        <Field label="Pronouns">
+          <TextInput value={pronouns} onChange={setPronouns} placeholder="e.g. they/them" />
+        </Field>
+
+        <Field
+          label="Bio"
+          right={
+            <span style={{
+              font:"400 12px var(--font-mono)",
+              color: charOver ? "var(--danger)" : (charNear ? "var(--warn)" : "var(--fg-muted)"),
+            }}>{charCount} / {charLimit}</span>
+          }
+        >
+          <textarea
+            value={bio}
+            onChange={e=>setBio(e.target.value)}
+            style={{
+              width:"100%", height:80, resize:"vertical",
+              padding:"10px 12px",
+              background:"var(--bg-elevated)",
+              border:"1px solid var(--border-subtle)",
+              borderRadius:6,
+              color:"var(--fg-primary)",
+              font:"400 13px var(--font-ui)",
+              lineHeight:1.5,
+              outline:"none",
+              transition:"border-color 0.12s, box-shadow 0.12s",
+            }}
+          />
+        </Field>
+
+        <Field label="Website">
+          <TextInput value={website} onChange={setWebsite} placeholder="https://…" />
+        </Field>
+
+        <Field label="GitHub username">
+          <TextInput value={github} onChange={setGithub} placeholder="@handle" />
+        </Field>
+      </div>
+
+      {/* SAVE ROW */}
+      <div style={{
+        display:"flex", justifyContent:"flex-end", gap:8,
+        borderTop:"1px solid var(--border-subtle)",
+        paddingTop:16, marginTop:24,
+      }}>
+        <button style={{
+          height:36,padding:"0 14px",
+          background:"transparent",
+          border:"1px solid var(--border-strong)",
+          borderRadius:6,
+          color:"var(--fg-primary)",
+          font:"500 13px var(--font-ui)",
+          transition:"background 0.12s",
+        }}
+          onMouseEnter={e=>e.currentTarget.style.background="var(--bg-elevated)"}
+          onMouseLeave={e=>e.currentTarget.style.background="transparent"}
+        >Cancel</button>
+        <button style={{
+          height:36,padding:"0 16px",
+          background:"var(--accent)",
+          border:"none",
+          borderRadius:6,
+          color:"var(--accent-fg)",
+          font:"600 13px var(--font-ui)",
+          transition:"background 0.12s",
+        }}
+          onMouseEnter={e=>e.currentTarget.style.background="var(--accent-hover)"}
+          onMouseLeave={e=>e.currentTarget.style.background="var(--accent)"}
+        >Save changes</button>
+      </div>
+
+      {/* APPEARANCE */}
+      <div style={{borderTop:"1px solid var(--border-subtle)",marginTop:40,paddingTop:32}}>
+        <h3 style={{font:"600 16px var(--font-ui)",color:"var(--fg-primary)",marginBottom:6,letterSpacing:"-0.005em"}}>Appearance</h3>
+        <div style={{font:"400 13px var(--font-ui)",color:"var(--fg-muted)",marginBottom:18}}>
+          Choose how Componi looks. System matches your device setting.
+        </div>
+
+        <Field label="Theme">
+          <ThemeControl />
+        </Field>
+      </div>
+
+      {/* spacer at bottom */}
+      <div style={{height:80}}></div>
+    </div>
+  );
+}
+
+function ThemeControl() {
+  const [tweaks, setTweak] = useTweaks(TWEAK_DEFAULTS);
+  const value = tweaks.appearanceMode || "dark";
+  const onChange = (v) => {
+    setTweak("appearanceMode", v);
+    // also reflect on doc when not "system"
+    if (v === "system") {
+      const sys = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+      document.documentElement.setAttribute("data-theme", sys);
+      setTweak("theme", sys);
+    } else {
+      document.documentElement.setAttribute("data-theme", v);
+      setTweak("theme", v);
+    }
+  };
+  return (
+    <Segmented
+      value={value}
+      onChange={onChange}
+      options={[
+        { k:"dark",   label:"Dark",   icon:IC.moon },
+        { k:"system", label:"System", icon:IC.monitor },
+        { k:"light",  label:"Light",  icon:IC.sun },
+      ]}
+    />
+  );
+}
+
+/* ─── Stub for non-profile sections ─── */
+function StubSection({ title, subtitle }) {
+  return (
+    <div>
+      <SectionHeader title={title} subtitle={subtitle} />
+      <div style={{
+        height:240,
+        border:"1px dashed var(--border-strong)",
+        borderRadius:8,
+        background:"var(--bg-surface)",
+        display:"flex",alignItems:"center",justifyContent:"center",
+        color:"var(--fg-muted)",
+        font:"400 13px var(--font-mono)",
+      }}>
+        {title.toLowerCase().replace(/\s+/g,"-")} · placeholder
+      </div>
+    </div>
+  );
+}
+
+const SECTION_META = {
+  profile:       { title:"Profile",        subtitle:"How others see you on Componi." },
+  account:       { title:"Account",        subtitle:"Email, password, and connected providers." },
+  privacy:       { title:"Privacy",        subtitle:"Who can see your activity, mentions, and forks." },
+  appearance:    { title:"Appearance",     subtitle:"Theme, density, and editor preferences." },
+  notifications: { title:"Notifications",  subtitle:"Choose what gets through and how." },
+  blocked:       { title:"Blocked users",  subtitle:"They can't see your profile or interact with your work." },
+  muted:         { title:"Muted users",    subtitle:"Hidden from your feed and notifications." },
+  export:        { title:"Data export",    subtitle:"Download a copy of everything you've published." },
+  delete:        { title:"Delete account", subtitle:"Permanently delete your account and components." },
+};
+
+/* ─── Settings Page ─── */
+function SettingsPage() {
+  const [tweaks, setTweak] = useTweaks(TWEAK_DEFAULTS);
+  const [active, setActive] = useState(tweaks.activeSection || "profile");
+
+  useEffect(()=>{ setActive(tweaks.activeSection); }, [tweaks.activeSection]);
+
+  // theme bootstrap
+  useEffect(() => {
+    const m = tweaks.appearanceMode;
+    if (m === "system") {
+      const sys = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+      document.documentElement.setAttribute("data-theme", sys);
+    } else if (m) {
+      document.documentElement.setAttribute("data-theme", m);
+    } else {
+      document.documentElement.setAttribute("data-theme", tweaks.theme || "dark");
+    }
+  }, [tweaks.theme, tweaks.appearanceMode]);
+
+  const handleNav = (k) => {
+    setActive(k);
+    setTweak("activeSection", k);
+  };
+
+  const meta = SECTION_META[active] || SECTION_META.profile;
+
+  return (
+    <div style={{minHeight:"100vh",background:"var(--bg-canvas)",display:"flex",flexDirection:"column"}}>
+      <TopBar />
+
+      {/* page heading band */}
+      <div style={{
+        maxWidth:896, width:"100%",
+        margin:"0 auto",
+        padding:"32px 24px 0",
+      }}>
+        <div style={{font:"500 12px var(--font-ui)",color:"var(--fg-muted)",letterSpacing:"0.06em",textTransform:"uppercase",marginBottom:8}}>Settings</div>
+        <h1 style={{font:"700 28px var(--font-ui)",color:"var(--fg-primary)",letterSpacing:"-0.02em"}}>
+          {NAV_GROUPS.flatMap(g=>g.items).find(i=>i.k===active)?.label || "Profile"}
+        </h1>
+      </div>
+
+      <main style={{
+        maxWidth:896, width:"100%",
+        margin:"0 auto",
+        display:"flex",
+        gap:32,
+        padding:"24px 24px 64px",
+        alignItems:"flex-start",
+      }}>
+        <SettingsNav active={active} setActive={handleNav} />
+
+        <section style={{flex:1, minWidth:0}}>
+          {active === "profile" && <ProfileSettings />}
+          {active !== "profile" && <StubSection title={meta.title} subtitle={meta.subtitle} />}
+        </section>
+      </main>
+
+      <TweaksPanel>
+        <TweakSection label="Active section" />
+        <TweakSelect id="activeSection" options={["profile","account","privacy","appearance","notifications","blocked","muted","export","delete"]} value={tweaks.activeSection} onChange={v=>setTweak("activeSection", v)} />
+        <TweakSection label="Appearance" />
+        <TweakRadio id="appearanceMode" options={["dark","system","light"]} value={tweaks.appearanceMode} onChange={v=>setTweak("appearanceMode", v)} />
+      </TweaksPanel>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<SettingsPage/>);
+</script>
+</body>
+</html>

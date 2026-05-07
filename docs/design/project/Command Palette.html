@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html data-theme="dark" lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>⌘K · Componi</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="tokens.css">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: var(--bg-canvas); color: var(--fg-primary);
+    font-family: var(--font-ui); -webkit-font-smoothing: antialiased;
+    height: 100%; overflow: hidden;
+  }
+  button { font-family: inherit; cursor: pointer; }
+  a { text-decoration: none; color: inherit; }
+  *::-webkit-scrollbar { width: 4px; }
+  *::-webkit-scrollbar-track { background: transparent; }
+  *::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 4px; }
+
+  @keyframes palette-in {
+    from { opacity: 0; transform: scale(0.96) translateY(-6px); }
+    to   { opacity: 1; transform: scale(1) translateY(0); }
+  }
+  @keyframes backdrop-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+  @keyframes chip-hover-reveal {
+    from { opacity: 0; transform: scale(0.8); }
+    to   { opacity: 1; transform: scale(1); }
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+
+<script type="text/babel">
+const { useState, useEffect, useRef, useCallback } = React;
+
+/* ─── TWEAK DEFAULTS ─── */
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "theme": "dark",
+  "variant": "results",
+  "highlightedRow": 1
+}/*EDITMODE-END*/;
+
+/* ─── Helpers ─── */
+const AV_PALETTE = ["#A31F37","#4F46E5","#0EA5E9","#10B981","#D97706","#7C3AED","#DB2777","#059669"];
+function avColor(n=""){ let h=0; for(let i=0;i<n.length;i++) h=(h*31+n.charCodeAt(i))>>>0; return AV_PALETTE[h%AV_PALETTE.length]; }
+
+function Logo({ size=18 }) {
+  return (
+    <div style={{display:"inline-flex",alignItems:"baseline",font:`600 ${size}px var(--font-ui)`,letterSpacing:"-0.04em",color:"var(--fg-primary)",userSelect:"none"}}>
+      compon<span style={{display:"inline-block",position:"relative"}}>i
+        <span style={{position:"absolute",left:`${size*0.15}px`,top:`${size*0.15}px`,width:`${Math.max(4,size*0.2)}px`,height:`${Math.max(4,size*0.2)}px`,background:"var(--accent)",borderRadius:"1px"}}/>
+      </span>
+    </div>
+  );
+}
+
+function Av({ name="?", size=28 }) {
+  const c = avColor(name);
+  return (
+    <div style={{
+      width:size, height:size, borderRadius:"50%", flexShrink:0,
+      background:`linear-gradient(135deg,${c} 0%,rgba(0,0,0,0.38) 100%)`,
+      display:"inline-flex", alignItems:"center", justifyContent:"center",
+      color:"#fff", font:`600 ${Math.round(size*0.42)}px var(--font-ui)`,
+    }}>{name[0]?.toUpperCase()}</div>
+  );
+}
+
+/* ─── Key badge ─── */
+function Key({ children }) {
+  return (
+    <span style={{
+      display:"inline-flex", alignItems:"center", justifyContent:"center",
+      minWidth:20, height:18, padding:"0 5px",
+      background:"var(--bg-elevated)",
+      border:"1px solid var(--border-strong)",
+      borderRadius:4,
+      font:`500 11px var(--font-mono)`,
+      color:"var(--fg-muted)",
+      lineHeight:1,
+      flexShrink:0,
+    }}>{children}</span>
+  );
+}
+
+/* ─── Section label ─── */
+function SectionLabel({ children }) {
+  return (
+    <div style={{
+      padding:"8px 10px 4px",
+      font:"600 10px var(--font-ui)",
+      color:"var(--fg-muted)",
+      letterSpacing:"0.08em",
+      textTransform:"uppercase",
+    }}>{children}</div>
+  );
+}
+
+/* ─── Mini component thumbnails (32×32) ─── */
+const MINI_THUMBS = {
+  "Command Palette": (dark) => (
+    <div style={{width:32,height:32,borderRadius:4,background:dark?"#12141A":"#F4F4F5",overflow:"hidden",border:`1px solid ${dark?"#23262D":"#E4E4E7"}`,display:"flex",flexDirection:"column",justifyContent:"center",gap:2,padding:"4px 5px"}}>
+      <div style={{height:2,background:"#8B1A2F",borderRadius:1,width:"80%"}}/>
+      {[70,55,65].map((w,i)=><div key={i} style={{height:2,background:dark?"#2E323B":"#D4D4D8",borderRadius:1,width:`${w}%`}}/>)}
+    </div>
+  ),
+  "Animated Tab Bar": (dark) => (
+    <div style={{width:32,height:32,borderRadius:4,background:dark?"#12141A":"#F4F4F5",overflow:"hidden",border:`1px solid ${dark?"#23262D":"#E4E4E7"}`,display:"flex",alignItems:"flex-end",justifyContent:"center",padding:"0 3px 4px"}}>
+      <div style={{display:"flex",gap:2,width:"100%"}}>
+        {[1,0,0,0].map((a,i)=><div key={i} style={{flex:1,height:a?10:7,borderRadius:"2px 2px 0 0",background:a?"#8B1A2F":(dark?"#23262D":"#D4D4D8")}}/>)}
+      </div>
+    </div>
+  ),
+  "Data Table": (dark) => (
+    <div style={{width:32,height:32,borderRadius:4,background:dark?"#12141A":"#F4F4F5",overflow:"hidden",border:`1px solid ${dark?"#23262D":"#E4E4E7"}`,padding:"4px 4px"}}>
+      <div style={{height:5,background:dark?"#1A1D24":"#E4E4E7",borderRadius:1,marginBottom:2}}/>
+      {[0,1,0].map((a,i)=><div key={i} style={{height:5,background:a?(dark?"rgba(139,26,47,0.2)":"rgba(139,26,47,0.08)"):"transparent",borderRadius:1,marginBottom:1,display:"flex",alignItems:"center",gap:2,paddingLeft:2}}>
+        {[40,35,30].map((w,j)=><div key={j} style={{height:2,background:a?"#8B1A2F":(dark?"#23262D":"#D4D4D8"),borderRadius:1,flex:w}}/>)}
+      </div>)}
+    </div>
+  ),
+};
+
+/* ─── Simulated blurred background (Home Feed snapshot) ─── */
+function FeedBackground({ dark }) {
+  const bg = dark ? "var(--bg-canvas)" : "var(--bg-canvas)";
+  // Rough layout of feed columns
+  return (
+    <div style={{
+      position:"fixed", inset:0,
+      background: dark
+        ? "linear-gradient(180deg,#0A0B0D 0%,#0F1015 100%)"
+        : "linear-gradient(180deg,#FAFAFA 0%,#F4F4F5 100%)",
+      overflow:"hidden",
+      userSelect:"none",
+      pointerEvents:"none",
+    }}>
+      {/* Simulated left sidebar */}
+      <div style={{position:"absolute",top:0,left:0,width:240,height:"100%",borderRight:`1px solid ${dark?"#23262D":"#E4E4E7"}`,padding:"24px 16px",display:"flex",flexDirection:"column",gap:8}}>
+        <div style={{height:20,width:80,background:dark?"#1A1D24":"#E4E4E7",borderRadius:4,marginBottom:12}}/>
+        {[1,0,0,0,0].map((a,i)=>(
+          <div key={i} style={{height:36,borderRadius:7,background:a?(dark?"#1A1D24":"#E8E8EA"):"transparent",display:"flex",alignItems:"center",padding:"0 10px",gap:10}}>
+            <div style={{width:16,height:16,borderRadius:3,background:dark?"#23262D":"#D4D4D8"}}/>
+            <div style={{height:4,flex:1,background:dark?"#1A1D24":"#E4E4E7",borderRadius:2}}/>
+          </div>
+        ))}
+        <div style={{height:34,borderRadius:7,background:"#8B1A2F",marginTop:8,opacity:0.4}}/>
+      </div>
+
+      {/* Simulated center feed */}
+      <div style={{position:"absolute",top:0,left:240,width:560,height:"100%",overflow:"hidden"}}>
+        {/* Topbar */}
+        <div style={{height:52,borderBottom:`1px solid ${dark?"#23262D":"#E4E4E7"}`,display:"flex",alignItems:"center",padding:"0 16px"}}>
+          <div style={{height:6,width:80,background:dark?"#1A1D24":"#E4E4E7",borderRadius:3}}/>
+        </div>
+        {/* Stories */}
+        <div style={{height:84,borderBottom:`1px solid ${dark?"#23262D":"#E4E4E7"}`,display:"flex",alignItems:"center",gap:14,padding:"0 16px"}}>
+          {[1,2,3,4,5].map(i=><div key={i} style={{width:54,height:54,borderRadius:"50%",background:i===1?"#8B1A2F":(dark?"#1A1D24":"#E4E4E7"),opacity:i===1?0.5:0.3,flexShrink:0}}/>)}
+        </div>
+        {/* Posts */}
+        {[280,260].map((h,pi)=>(
+          <div key={pi} style={{borderBottom:`1px solid ${dark?"#23262D":"#E4E4E7"}`}}>
+            <div style={{display:"flex",alignItems:"center",gap:10,padding:"12px 16px"}}>
+              <div style={{width:34,height:34,borderRadius:"50%",background:dark?"#1A1D24":"#E4E4E7"}}/>
+              <div style={{flex:1}}>
+                <div style={{height:5,width:80,background:dark?"#1A1D24":"#E4E4E7",borderRadius:3,marginBottom:4}}/>
+                <div style={{height:4,width:120,background:dark?"#23262D":"#F4F4F5",borderRadius:3}}/>
+              </div>
+            </div>
+            <div style={{height:h,background:dark?"#12141A":"#F4F4F5",margin:"0 16px",borderRadius:6}}/>
+            <div style={{height:48}}/>
+          </div>
+        ))}
+      </div>
+
+      {/* Simulated right rail */}
+      <div style={{position:"absolute",top:0,right:0,width:300,height:"100%",borderLeft:`1px solid ${dark?"#23262D":"#E4E4E7"}`,padding:"24px 20px",display:"flex",flexDirection:"column",gap:12}}>
+        <div style={{height:34,borderRadius:7,background:dark?"#12141A":"#F4F4F5",border:`1px solid ${dark?"#23262D":"#E4E4E7"}`}}/>
+        <div style={{height:16,width:120,background:dark?"#1A1D24":"#E4E4E7",borderRadius:4,marginTop:4}}/>
+        {[1,2,3,4,5].map(i=>(
+          <div key={i} style={{height:36,display:"flex",alignItems:"center",gap:10,borderTop:`1px solid ${dark?"#23262D":"#F4F4F5"}`}}>
+            <div style={{width:20,height:5,background:dark?"#23262D":"#E4E4E7",borderRadius:2}}/>
+            <div style={{flex:1,height:5,background:dark?"#1A1D24":"#F4F4F5",borderRadius:3}}/>
+            <div style={{width:24,height:5,background:dark?"#23262D":"#E4E4E7",borderRadius:2}}/>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ─── Command Palette modal ─── */
+function CommandPalette({ dark, variant, highlightedRow, onClose }) {
+  const [query, setQuery]       = useState(variant === "empty" ? "abc" : "");
+  const [recentChips, setRecentChips] = useState(["react modal","data table","animation"]);
+  const [activeIdx, setActiveIdx]     = useState(highlightedRow);
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+    inputRef.current?.focus();
+    setQuery(variant === "empty" ? "abc" : "");
+    setActiveIdx(highlightedRow);
+  }, [variant, highlightedRow]);
+
+  // Keyboard nav
+  useEffect(() => {
+    const TOTAL_ROWS = 3 + 2 + 2 + 4; // components + people + tags + actions
+    const onKey = (e) => {
+      if (e.key === "Escape") { onClose(); return; }
+      if (e.key === "ArrowDown") { e.preventDefault(); setActiveIdx(i => Math.min(i+1, TOTAL_ROWS-1)); }
+      if (e.key === "ArrowUp")   { e.preventDefault(); setActiveIdx(i => Math.max(i-1, 0)); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const isEmpty = variant === "empty" || query.trim().length > 0 && query !== "";
+  const showEmpty = variant === "empty";
+
+  // ── Row component ──
+  let globalIdx = 0;
+  function Row({ children, isActive, onClick }) {
+    const idx = globalIdx++;
+    const active = isActive !== undefined ? isActive : idx === activeIdx;
+    return (
+      <div
+        onClick={onClick}
+        onMouseEnter={() => setActiveIdx(idx)}
+        style={{
+          display:"flex", alignItems:"center", gap:10,
+          height:36, padding:"0 8px",
+          borderRadius:6,
+          background: active ? "var(--bg-elevated)" : "transparent",
+          cursor:"pointer",
+          transition:"background 0.08s",
+          position:"relative",
+        }}
+      >
+        {/* Accent left border when active */}
+        {active && (
+          <div style={{
+            position:"absolute", left:0, top:6, bottom:6,
+            width:2, borderRadius:2,
+            background:"var(--accent)",
+          }}/>
+        )}
+        {children}
+      </div>
+    );
+  }
+
+  return (
+    <div style={{
+      width:"min(560px, calc(100vw - 32px))",
+      maxHeight:"60vh",
+      background:"var(--bg-surface)",
+      border:"1px solid var(--border-strong)",
+      borderRadius:12,
+      display:"flex",
+      flexDirection:"column",
+      overflow:"hidden",
+      boxShadow: dark
+        ? "0 0 0 1px rgba(255,255,255,0.04), 0 24px 64px rgba(0,0,0,0.7), 0 8px 24px rgba(0,0,0,0.5)"
+        : "0 0 0 1px rgba(0,0,0,0.06), 0 16px 48px rgba(0,0,0,0.18), 0 4px 12px rgba(0,0,0,0.08)",
+      animation:"palette-in 160ms cubic-bezier(0.22,1,0.36,1) both",
+    }}>
+
+      {/* ── INPUT ROW ── */}
+      <div style={{
+        display:"flex", alignItems:"center", gap:10,
+        padding:"12px 14px 10px",
+        borderBottom:"1px solid var(--border-subtle)",
+        flexShrink:0,
+      }}>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{color:"var(--fg-muted)",flexShrink:0}}>
+          <circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/>
+        </svg>
+        <input
+          ref={inputRef}
+          value={query}
+          onChange={e => setQuery(e.target.value)}
+          placeholder="Search components, people… or try /new"
+          style={{
+            flex:1, background:"transparent", border:"none", outline:"none",
+            font:"400 14px var(--font-ui)", color:"var(--fg-primary)",
+            lineHeight:1,
+          }}
+          onKeyDown={e => { if(e.key==="Escape"){ e.preventDefault(); onClose(); } }}
+        />
+        <Key>Esc</Key>
+      </div>
+
+      {/* ── RECENT SEARCHES ── */}
+      {!showEmpty && (
+        <div style={{
+          display:"flex", alignItems:"center", gap:8, flexWrap:"wrap",
+          padding:"8px 14px",
+          borderBottom:"1px solid var(--border-subtle)",
+          flexShrink:0,
+        }}>
+          <span style={{font:"600 10px var(--font-ui)",color:"var(--fg-muted)",letterSpacing:"0.08em",textTransform:"uppercase",flexShrink:0}}>Recent</span>
+          {recentChips.map(chip => (
+            <RecentChip key={chip} label={chip} onDismiss={() => setRecentChips(c => c.filter(x => x !== chip))} />
+          ))}
+        </div>
+      )}
+
+      {/* ── RESULTS or EMPTY STATE ── */}
+      {showEmpty ? (
+        <div style={{
+          flex:1, display:"flex", flexDirection:"column",
+          alignItems:"center", justifyContent:"center",
+          gap:8, padding:"32px 24px",
+        }}>
+          {/* SearchX icon */}
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{color:"var(--fg-muted)"}}>
+            <circle cx="11" cy="11" r="7"/>
+            <path d="m21 21-4.3-4.3"/>
+            <path d="m8.5 8.5 5 5M13.5 8.5l-5 5"/>
+          </svg>
+          <div style={{font:"500 14px var(--font-ui)",color:"var(--fg-secondary)",marginTop:2}}>
+            No results for <span style={{font:"600 14px var(--font-mono)",color:"var(--fg-primary)"}}>"abc"</span>
+          </div>
+          <div style={{font:"400 13px var(--font-ui)",color:"var(--fg-muted)"}}>
+            Try <span style={{font:"500 13px var(--font-mono)",color:"var(--accent-hover)",cursor:"pointer"}}>/new</span> to create it.
+          </div>
+        </div>
+      ) : (
+        <div style={{flex:1, overflowY:"auto", padding:"6px 8px 6px"}}>
+
+          {/* COMPONENTS */}
+          <SectionLabel>Components</SectionLabel>
+          {[
+            { name:"Command Palette", handle:"luiz",     fw:"React" },
+            { name:"Animated Tab Bar",handle:"sarah",    fw:"React" },
+            { name:"Data Table",      handle:"priya",    fw:"React" },
+          ].map(item => {
+            const Thumb = MINI_THUMBS[item.name];
+            return (
+              <Row key={item.name}>
+                {Thumb ? Thumb(dark) : <div style={{width:32,height:32,borderRadius:4,background:"var(--bg-elevated)",flexShrink:0}}/>}
+                <span style={{font:"500 13px var(--font-ui)",color:"var(--fg-primary)",flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{item.name}</span>
+                <span style={{font:"400 12px var(--font-mono)",color:"var(--fg-muted)",flexShrink:0}}>@{item.handle}</span>
+                <span style={{
+                  padding:"1px 6px", borderRadius:3, flexShrink:0,
+                  font:"500 11px var(--font-mono)",
+                  background:"var(--bg-elevated)", color:"var(--fg-muted)",
+                  border:"1px solid var(--border-subtle)",
+                }}>{item.fw}</span>
+              </Row>
+            );
+          })}
+
+          {/* PEOPLE */}
+          <SectionLabel>People</SectionLabel>
+          {[
+            { name:"Sarah Chen",    handle:"sarah_dev", followers:"4.2k" },
+            { name:"Carlos Mendes", handle:"carlosm",   followers:"1.8k" },
+          ].map(p => (
+            <Row key={p.handle}>
+              <Av name={p.name} size={28}/>
+              <span style={{font:"500 13px var(--font-ui)",color:"var(--fg-primary)",flex:1}}>{p.name}</span>
+              <span style={{font:"400 12px var(--font-mono)",color:"var(--fg-muted)"}}>{p.followers} followers</span>
+            </Row>
+          ))}
+
+          {/* TAGS */}
+          <SectionLabel>Tags</SectionLabel>
+          {[
+            { tag:"animation", count:"1.2k components" },
+            { tag:"forms",     count:"890 components" },
+          ].map(t => (
+            <Row key={t.tag}>
+              <span style={{width:28,height:28,display:"inline-flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" style={{color:"var(--accent-hover)"}}>
+                  <line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/>
+                  <line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/>
+                </svg>
+              </span>
+              <span style={{font:"500 13px var(--font-ui)",color:"var(--fg-primary)",flex:1}}>#{t.tag}</span>
+              <span style={{font:"400 12px var(--font-mono)",color:"var(--fg-muted)"}}>{t.count}</span>
+            </Row>
+          ))}
+
+          {/* ACTIONS */}
+          <SectionLabel>Actions</SectionLabel>
+          {[
+            { icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>, label:"Create new component", kbd:"⌘N" },
+            { icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>, label:"Go to my profile", kbd:null },
+            { icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>, label:"Toggle theme", kbd:null },
+            { icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>, label:"View notifications", kbd:null, badge:3 },
+          ].map(action => (
+            <Row key={action.label}>
+              <span style={{width:28,height:28,display:"inline-flex",alignItems:"center",justifyContent:"center",flexShrink:0,color:"var(--fg-muted)"}}>
+                {action.icon}
+              </span>
+              <span style={{font:"500 13px var(--font-ui)",color:"var(--fg-primary)",flex:1}}>{action.label}</span>
+              {action.badge && (
+                <span style={{
+                  minWidth:18, height:18, padding:"0 5px",
+                  borderRadius:999, background:"var(--accent)",
+                  color:"#fff", font:"600 10px var(--font-mono)",
+                  display:"inline-flex", alignItems:"center", justifyContent:"center",
+                  flexShrink:0,
+                }}>{action.badge}</span>
+              )}
+              {action.kbd && <Key>{action.kbd}</Key>}
+            </Row>
+          ))}
+
+          <div style={{height:4}}/>
+        </div>
+      )}
+
+      {/* ── KEYBOARD FOOTER ── */}
+      <div style={{
+        display:"flex", alignItems:"center", gap:14,
+        padding:"8px 14px",
+        borderTop:"1px solid var(--border-subtle)",
+        flexShrink:0,
+      }}>
+        {[
+          { keys:["↑","↓"], label:"navigate" },
+          { keys:["↵"],     label:"select" },
+          { keys:["Esc"],   label:"close" },
+        ].map(item => (
+          <div key={item.label} style={{display:"flex",alignItems:"center",gap:4}}>
+            <div style={{display:"flex",gap:2}}>
+              {item.keys.map(k=><Key key={k}>{k}</Key>)}
+            </div>
+            <span style={{font:"400 11px var(--font-ui)",color:"var(--fg-muted)"}}>{item.label}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ─── Recent chip ─── */
+function RecentChip({ label, onDismiss }) {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <div
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        display:"inline-flex", alignItems:"center", gap:4,
+        height:24, padding:"0 8px",
+        background:"var(--bg-elevated)",
+        border:"1px solid var(--border-subtle)",
+        borderRadius:999,
+        font:"400 12px var(--font-ui)",
+        color:"var(--fg-secondary)",
+        cursor:"pointer",
+        transition:"border-color 0.1s",
+        borderColor: hovered ? "var(--border-strong)" : "var(--border-subtle)",
+      }}
+    >
+      {label}
+      {hovered && (
+        <button
+          onClick={e => { e.stopPropagation(); onDismiss(); }}
+          style={{
+            display:"inline-flex", alignItems:"center", justifyContent:"center",
+            width:12, height:12, borderRadius:"50%",
+            background:"var(--border-strong)", border:"none",
+            color:"var(--fg-secondary)", padding:0, cursor:"pointer",
+            animation:"chip-hover-reveal 0.1s ease-out both",
+          }}
+        >
+          <svg width="7" height="7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      )}
+    </div>
+  );
+}
+
+/* ─── Full-screen overlay ─── */
+function PaletteOverlay({ dark, variant, highlightedRow, onClose }) {
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position:"fixed", inset:0, zIndex:100,
+        display:"flex", alignItems:"flex-start", justifyContent:"center",
+        paddingTop:"clamp(60px, 12vh, 120px)",
+        background: dark ? "rgba(10,11,13,0.65)" : "rgba(250,250,250,0.7)",
+        backdropFilter:"blur(6px)",
+        WebkitBackdropFilter:"blur(6px)",
+        animation:"backdrop-in 120ms ease-out both",
+      }}
+    >
+      <div onClick={e => e.stopPropagation()}>
+        <CommandPalette
+          dark={dark}
+          variant={variant}
+          highlightedRow={highlightedRow}
+          onClose={onClose}
+        />
+      </div>
+    </div>
+  );
+}
+
+/* ─── App ─── */
+function App() {
+  const [tweaks, setTweak] = useTweaks(TWEAK_DEFAULTS);
+  const [open, setOpen] = useState(true);
+
+  const dark    = tweaks.theme === "dark";
+  const variant = tweaks.variant;   // "results" | "empty"
+  const highlighted = tweaks.highlightedRow;
+
+  // Sync theme to html element
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", tweaks.theme);
+  }, [tweaks.theme]);
+
+  // ⌘K to open
+  useEffect(() => {
+    const onKey = e => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        setOpen(v => !v);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  return (
+    <div style={{height:"100vh", overflow:"hidden", position:"relative"}}>
+      {/* Background */}
+      <FeedBackground dark={dark} />
+
+      {/* ⌘K trigger hint */}
+      {!open && (
+        <div style={{
+          position:"fixed", top:"50%", left:"50%",
+          transform:"translate(-50%,-50%)",
+          zIndex:10,
+          display:"flex", flexDirection:"column", alignItems:"center", gap:12,
+        }}>
+          <div style={{
+            display:"flex", alignItems:"center", gap:8,
+            padding:"10px 20px", borderRadius:10,
+            background:"var(--bg-surface)",
+            border:"1px solid var(--border-strong)",
+            boxShadow: dark ? "0 8px 24px rgba(0,0,0,0.5)" : "0 4px 16px rgba(0,0,0,0.1)",
+            cursor:"pointer",
+          }} onClick={() => setOpen(true)}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{color:"var(--fg-muted)"}}>
+              <circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/>
+            </svg>
+            <span style={{font:"400 13px var(--font-ui)", color:"var(--fg-muted)"}}>Search or jump to…</span>
+            <Key>⌘K</Key>
+          </div>
+          <span style={{font:"400 11px var(--font-ui)", color:"var(--fg-muted)"}}>Click above or press ⌘K to open</span>
+        </div>
+      )}
+
+      {/* Overlay */}
+      {open && (
+        <PaletteOverlay
+          dark={dark}
+          variant={variant}
+          highlightedRow={highlighted}
+          onClose={() => setOpen(false)}
+        />
+      )}
+
+      {/* Tweaks */}
+      <TweaksPanel>
+        <TweakSection label="Theme" />
+        <TweakRadio id="theme" options={["dark","light"]} value={tweaks.theme} onChange={v => setTweak("theme", v)} />
+        <TweakSection label="Variant" />
+        <TweakRadio id="variant" options={["results","empty"]} value={tweaks.variant} onChange={v => setTweak("variant", v)} />
+        <TweakSection label="Highlighted row" />
+        <TweakSlider id="highlightedRow" min={0} max={10} step={1} value={tweaks.highlightedRow} onChange={v => setTweak("highlightedRow", v)} />
+      </TweaksPanel>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>

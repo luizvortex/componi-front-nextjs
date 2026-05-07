@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html data-theme="dark" lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Command Palette · Componi</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="tokens.css">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: var(--bg-canvas); color: var(--fg-primary); font-family: var(--font-ui); -webkit-font-smoothing: antialiased; }
+  button { font-family: inherit; cursor: pointer; }
+  a { text-decoration: none; color: inherit; }
+  *::-webkit-scrollbar { width: 5px; height: 5px; }
+  *::-webkit-scrollbar-track { background: transparent; }
+  *::-webkit-scrollbar-thumb { background: var(--border-subtle); border-radius: 4px; }
+  button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+
+  /* Code highlighting */
+  .tok-kw  { color: #C792EA; }
+  .tok-fn  { color: #82AAFF; }
+  .tok-str { color: #C3E88D; }
+  .tok-cm  { color: #546E7A; font-style: italic; }
+  .tok-px  { color: #F78C6C; }
+  .tok-op  { color: #89DDFF; }
+  .tok-pl  { color: #FFCB6B; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script type="text/babel">
+const { useState, useEffect, useRef } = React;
+
+/* ─── ICONS ─── */
+const IC = {
+  heart:    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>,
+  heartFill:<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>,
+  fork:     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.59 13.51 6.83 3.98M15.41 6.51l-6.82 3.98"/></svg>,
+  share:    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>,
+  copy:     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>,
+  check:    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>,
+  download: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>,
+  search:   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>,
+  bell:     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>,
+  home:     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>,
+  compass:  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>,
+  plus:     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>,
+  user:     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>,
+  settings: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>,
+  externalLink: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>,
+  chevronDown: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>,
+  back:     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>,
+  sun:      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>,
+  moon:     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>,
+};
+
+/* ─── Helpers ─── */
+const AV_PALETTE = ["#A31F37","#4F46E5","#0EA5E9","#10B981","#D97706","#7C3AED","#DB2777","#059669"];
+function avColor(n=""){ let h=0; for(let i=0;i<n.length;i++) h=(h*31+n.charCodeAt(i))>>>0; return AV_PALETTE[h%AV_PALETTE.length]; }
+
+function Logo({ size=18 }) {
+  return (
+    <div style={{display:"inline-flex",alignItems:"baseline",font:`600 ${size}px var(--font-ui)`,letterSpacing:"-0.04em",color:"var(--fg-primary)",userSelect:"none"}}>
+      compon<span style={{display:"inline-block",position:"relative"}}>i<span style={{position:"absolute",left:`${size*0.15}px`,top:`${size*0.15}px`,width:`${Math.max(4,size*0.2)}px`,height:`${Math.max(4,size*0.2)}px`,background:"var(--accent)",borderRadius:"1px"}}/></span>
+    </div>
+  );
+}
+
+function Av({ name="M", size=36, color }) {
+  const c = color||avColor(name);
+  return <div style={{width:size,height:size,borderRadius:"50%",flexShrink:0,background:`linear-gradient(135deg,${c} 0%,rgba(0,0,0,0.45) 100%)`,display:"inline-flex",alignItems:"center",justifyContent:"center",color:"#fff",font:`600 ${Math.round(size*0.42)}px var(--font-ui)`}}>{name[0]?.toUpperCase()}</div>;
+}
+
+function FwBadge({ fw }) {
+  const dots = { React:"#61DAFB", Vue:"#42B883", Svelte:"#FF3E00" };
+  return <span style={{display:"inline-flex",alignItems:"center",gap:5,height:22,padding:"0 10px",borderRadius:4,font:"500 11px var(--font-mono)",background:"var(--bg-elevated)",color:"var(--fg-secondary)",border:"1px solid var(--border-subtle)"}}>
+    <span style={{width:6,height:6,borderRadius:"50%",background:dots[fw]||"var(--accent)"}}/>{fw}
+  </span>;
+}
+
+function GhostBtn({ icon, children, onClick, active }) {
+  return <button onClick={onClick} style={{display:"inline-flex",alignItems:"center",gap:6,height:30,padding:children?"0 12px":"0 8px",width:children?undefined:30,borderRadius:6,background:active?"var(--bg-elevated)":"transparent",border:"1px solid var(--border-subtle)",color:"var(--fg-secondary)",font:"500 12px var(--font-ui)",transition:"background 0.12s,color 0.12s"}}
+    onMouseEnter={e=>{e.currentTarget.style.background="var(--bg-elevated)";e.currentTarget.style.color="var(--fg-primary)";}}
+    onMouseLeave={e=>{e.currentTarget.style.background=active?"var(--bg-elevated)":"transparent";e.currentTarget.style.color="var(--fg-secondary)";}}>
+    {icon}{children}
+  </button>;
+}
+
+/* ─── Preview art for hero ─── */
+function HeroPreview() {
+  return (
+    <div style={{width:"100%",height:"100%",background:"radial-gradient(circle at 55% 40%,#1A1D24 0%,#0A0B0D 72%)",display:"flex",alignItems:"center",justifyContent:"center"}}>
+      <div style={{width:"60%",maxWidth:420,background:"#12141A",border:"1px solid #2E323B",borderRadius:12,overflow:"hidden",boxShadow:"0 24px 80px rgba(0,0,0,0.7)"}}>
+        <div style={{padding:"12px 16px",borderBottom:"1px solid #23262D",display:"flex",alignItems:"center",gap:10}}>
+          <div style={{width:16,height:16,borderRadius:"50%",border:"1.5px solid #71717A",opacity:0.5}}/>
+          <div style={{flex:1,height:4,background:"#2E323B",borderRadius:2}}/>
+          <span style={{font:"500 11px monospace",color:"#71717A",padding:"3px 7px",background:"#1A1D24",borderRadius:4,border:"1px solid #23262D"}}>⌘K</span>
+        </div>
+        {[{a:true,label:"Command Palette · @luiz"},{a:false,label:"Animated Tab Bar"},{a:false,label:"Data Table · @priya"},{a:false,label:"Toast System · @felix"}].map((r,i)=>(
+          <div key={i} style={{padding:"10px 16px",display:"flex",alignItems:"center",gap:10,background:r.a?"#3D0B14":"transparent",borderLeft:r.a?"2px solid #8B1A2F":"2px solid transparent",transition:"background 0.12s"}}>
+            <div style={{width:8,height:8,borderRadius:"50%",background:r.a?"#8B1A2F":"#2E323B"}}/>
+            <span style={{font:`${r.a?"600":"400"} 13px var(--font-ui)`,color:r.a?"#F5F5F7":"#71717A",flex:1}}>{r.label}</span>
+            {r.a && <span style={{font:"500 10px monospace",padding:"2px 6px",borderRadius:3,background:"#1A1D24",border:"1px solid #23262D",color:"#71717A"}}>⏎</span>}
+          </div>
+        ))}
+        <div style={{padding:"10px 16px",borderTop:"1px solid #23262D",display:"flex",gap:16}}>
+          {["↑↓ navigate","⏎ open","Esc close"].map(k=><span key={k} style={{font:"400 10px monospace",color:"#546E7A"}}>{k}</span>)}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Mini preview thumbnail ─── */
+function MiniPreview({ seed=0 }) {
+  const bgs = [
+    "radial-gradient(circle at 55% 40%,#1A1D24 0%,#0A0B0D 72%)",
+    "linear-gradient(135deg,#12141A 0%,#1A1D24 100%)",
+    "linear-gradient(135deg,#3D0B14 0%,#0A0B0D 100%)",
+    "radial-gradient(circle at 30% 60%,#1A1D24 0%,#0A0B0D 70%)",
+    "linear-gradient(135deg,#0A0B0D 0%,#12141A 100%)",
+  ];
+  return (
+    <div style={{width:"100%",height:"100%",background:bgs[seed%bgs.length],display:"flex",alignItems:"center",justifyContent:"center"}}>
+      <div style={{display:"flex",flexDirection:"column",gap:4,width:"70%"}}>
+        {[80,60,40].map((w,i)=><div key={i} style={{height:5,borderRadius:2,background:i===0?"#8B1A2F":"#23262D",width:`${w}%`}}/>)}
+      </div>
+    </div>
+  );
+}
+
+/* ─── LINEAGE TAB ─── */
+const LINEAGE_NODES = [
+  { id:"anc1", level:0, col:0, row:0, name:"modal-base",     author:"@kenji",  forks:3,  seed:1 },
+  { id:"anc2", level:1, col:1, row:0, name:"modal-v2",       author:"@theo",   forks:12, seed:2 },
+  { id:"curr", level:2, col:2, row:0, name:"command-palette",author:"@luiz",   forks:34, seed:0, current:true },
+  { id:"d1",   level:3, col:3, row:0, name:"cmd-dark",       author:"@sarah",  forks:5,  seed:3 },
+  { id:"d2",   level:3, col:3, row:1, name:"cmd-vue",        author:"@carlos", forks:8,  seed:4 },
+  { id:"d3",   level:3, col:3, row:2, name:"cmd-mini",       author:"@anya",   forks:2,  seed:1 },
+];
+
+const LINEAGE_EDGES = [
+  { from:"anc1", to:"anc2" },
+  { from:"anc2", to:"curr" },
+  { from:"curr", to:"d1" },
+  { from:"curr", to:"d2" },
+  { from:"curr", to:"d3" },
+];
+
+const NODE_W = 90, NODE_H = 90, COL_GAP = 80, ROW_GAP = 20;
+
+function getNodePos(node) {
+  return {
+    x: node.col * (NODE_W + COL_GAP),
+    y: node.row * (NODE_H + ROW_GAP),
+  };
+}
+
+function LineageTab() {
+  const [hovered, setHovered] = useState(null);
+  const totalCols = 4, totalRows = 3;
+  const svgW = totalCols * (NODE_W + COL_GAP) - COL_GAP + 40;
+  const svgH = totalRows * (NODE_H + ROW_GAP) - ROW_GAP;
+
+  return (
+    <div style={{overflowX:"auto",padding:"24px 0 32px",scrollbarWidth:"thin"}}>
+      <div style={{position:"relative",display:"inline-block",minWidth:svgW+40,padding:"0 20px"}}>
+        {/* SVG edges */}
+        <svg style={{position:"absolute",top:0,left:0,width:svgW+40,height:svgH,pointerEvents:"none",overflow:"visible"}}>
+          {LINEAGE_EDGES.map(e=>{
+            const from = LINEAGE_NODES.find(n=>n.id===e.from);
+            const to   = LINEAGE_NODES.find(n=>n.id===e.to);
+            const fx = getNodePos(from).x + NODE_W + 20;
+            const fy = getNodePos(from).y + NODE_H/2;
+            const tx = getNodePos(to).x + 20;
+            const ty = getNodePos(to).y + NODE_H/2;
+            const cx = (fx+tx)/2;
+            const isAccent = from.id==="curr"||to.id==="curr";
+            const dimmed = hovered && hovered!==from.id && hovered!==to.id;
+            return (
+              <path key={`${e.from}-${e.to}`}
+                d={`M${fx},${fy} C${cx},${fy} ${cx},${ty} ${tx},${ty}`}
+                fill="none"
+                stroke={isAccent?"var(--accent)":"var(--border-strong)"}
+                strokeWidth={isAccent?2:1.5}
+                opacity={dimmed?0.15:1}
+                strokeDasharray={isAccent?"none":"4 3"}
+                style={{transition:"opacity 0.15s"}}
+              />
+            );
+          })}
+          {/* Arrow heads */}
+          {LINEAGE_EDGES.map(e=>{
+            const to = LINEAGE_NODES.find(n=>n.id===e.to);
+            const from = LINEAGE_NODES.find(n=>n.id===e.from);
+            const tx = getNodePos(to).x + 20;
+            const ty = getNodePos(to).y + NODE_H/2;
+            const isAccent = from.id==="curr"||to.id==="curr";
+            const dimmed = hovered && hovered!==from.id && hovered!==to.id;
+            return (
+              <polygon key={`arr-${e.to}`}
+                points={`${tx},${ty} ${tx-8},${ty-4} ${tx-8},${ty+4}`}
+                fill={isAccent?"var(--accent)":"var(--border-strong)"}
+                opacity={dimmed?0.15:1}
+                style={{transition:"opacity 0.15s"}}
+              />
+            );
+          })}
+        </svg>
+
+        {/* Nodes */}
+        <div style={{position:"relative",height:svgH}}>
+          {LINEAGE_NODES.map(node=>{
+            const { x, y } = getNodePos(node);
+            const isHovered = hovered===node.id;
+            const isDimmed = hovered && !node.current && hovered!==node.id;
+            return (
+              <div key={node.id}
+                onMouseEnter={()=>setHovered(node.id)}
+                onMouseLeave={()=>setHovered(null)}
+                style={{
+                  position:"absolute",
+                  left: x+20, top: y,
+                  width:NODE_W, height:NODE_H,
+                  borderRadius:8,overflow:"hidden",cursor:"pointer",
+                  border:`${node.current?"2px solid var(--accent)":"1px solid var(--border-subtle)"}`,
+                  boxShadow: node.current?"0 0 0 4px var(--accent-muted)":(isHovered?"0 4px 20px rgba(0,0,0,0.4)":"none"),
+                  transform: node.current?"scale(1.08)":(isHovered?"scale(1.04)":"scale(1)"),
+                  opacity: isDimmed?0.3:1,
+                  transition:"transform 0.15s, opacity 0.15s, box-shadow 0.15s",
+                  zIndex: node.current?10:(isHovered?5:1),
+                  background:"var(--bg-elevated)",
+                }}>
+                <MiniPreview seed={node.seed} />
+                {/* Author avatar tucked bottom-right */}
+                <div style={{position:"absolute",bottom:6,right:6}}>
+                  <Av name={node.author.slice(1)} size={20} />
+                </div>
+                {/* Name below (absolute, outside overflow) */}
+                <div style={{
+                  position:"absolute",bottom:-38,left:"50%",transform:"translateX(-50%)",
+                  whiteSpace:"nowrap",textAlign:"center",pointerEvents:"none",
+                }}>
+                  <div style={{font:`${node.current?"600":"500"} 11px var(--font-ui)`,color:node.current?"var(--fg-primary)":"var(--fg-secondary)"}}>{node.name}</div>
+                  <div style={{font:"400 10px monospace",color:"var(--fg-muted)"}}>{node.author} · ⑂{node.forks}</div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        {/* Spacer for labels below nodes */}
+        <div style={{height:44}}/>
+      </div>
+    </div>
+  );
+}
+
+/* ─── CODE TAB ─── */
+const CODE_LINES = [
+  { tokens: [{t:"cm",v:"// command-palette.tsx — @luiz/command-palette v3.2"}] },
+  { tokens: [] },
+  { tokens: [{t:"kw",v:"import"},{t:"op",v:" { "},{t:"pl",v:"useState"},{t:"op",v:", "},{t:"pl",v:"useEffect"},{t:"op",v:", "},{t:"pl",v:"useRef"},{t:"op",v:" } "},{t:"kw",v:"from"},{t:"str",v:" 'react'"}] },
+  { tokens: [{t:"kw",v:"import"},{t:"op",v:" { "},{t:"pl",v:"Command"},{t:"op",v:" } "},{t:"kw",v:"from"},{t:"str",v:" '@/components/ui'"}] },
+  { tokens: [] },
+  { tokens: [{t:"kw",v:"interface"},{t:"fn",v:" CommandPaletteProps"},{t:"op",v:" {"}] },
+  { tokens: [{t:"pl",v:"  open"},{t:"op",v:":"},{t:"kw",v:" boolean"},{t:"op",v:";"}] },
+  { tokens: [{t:"pl",v:"  onClose"},{t:"op",v:":"},{t:"fn",v:" () => void"},{t:"op",v:";"}] },
+  { tokens: [{t:"pl",v:"  commands"},{t:"op",v:":"},{t:"fn",v:" CommandItem[]"},{t:"op",v:";"}] },
+  { tokens: [{t:"op",v:"}"}] },
+  { tokens: [] },
+  { tokens: [{t:"kw",v:"export"},{t:"kw",v:" function"},{t:"fn",v:" CommandPalette"},{t:"op",v:"({"},{t:"pl",v:"open"},{t:"op",v:","},{t:"pl",v:"onClose"},{t:"op",v:","},{t:"pl",v:"commands"},{t:"op",v:"}:"},{t:"fn",v:" CommandPaletteProps"},{t:"op",v:") {"}] },
+  { tokens: [{t:"kw",v:"  const"},{t:"op",v:" ["},{t:"pl",v:"query"},{t:"op",v:","},{t:"pl",v:"setQuery"},{t:"op",v:"] ="},{t:"fn",v:" useState"},{t:"op",v:"("},{t:"str",v:"''"},{t:"op",v:")"}] },
+  { tokens: [{t:"kw",v:"  const"},{t:"op",v:" ["},{t:"pl",v:"selected"},{t:"op",v:","},{t:"pl",v:"setSelected"},{t:"op",v:"] ="},{t:"fn",v:" useState"},{t:"op",v:"("},{t:"px",v:"0"},{t:"op",v:")"}] },
+  { tokens: [{t:"kw",v:"  const"},{t:"pl",v:" inputRef"},{t:"op",v:" ="},{t:"fn",v:" useRef"},{t:"op",v:"<"},{t:"fn",v:"HTMLInputElement"},{t:"op",v:">"}] },
+  { tokens: [] },
+  { tokens: [{t:"kw",v:"  const"},{t:"pl",v:" filtered"},{t:"op",v:" = "},{t:"pl",v:"commands"},{t:"op",v:"."},{t:"fn",v:"filter"},{t:"op",v:"(c => c."},{t:"pl",v:"label"},{t:"op",v:"."},{t:"fn",v:"toLowerCase"},{t:"op",v:"()."},{t:"fn",v:"includes"},{t:"op",v:"("}],},
+  { tokens: [{t:"pl",v:"    query"},{t:"op",v:"."},{t:"fn",v:"toLowerCase"},{t:"op",v:"()))"}] },
+  { tokens: [] },
+  { tokens: [{t:"kw",v:"  if"},{t:"op",v:" (!"},{t:"pl",v:"open"},{t:"op",v:") "},{t:"kw",v:"return"},{t:"kw",v:" null"}] },
+  { tokens: [] },
+  { tokens: [{t:"kw",v:"  return"},{t:"op",v:" ("}] },
+  { tokens: [{t:"op",v:"    <"},{t:"fn",v:"Command"},{t:"op",v:"."},{t:"fn",v:"Dialog"},{t:"op",v:" "},{t:"pl",v:"open"},{t:"op",v:"={"},{t:"pl",v:"open"},{t:"op",v:"} "},{t:"pl",v:"onOpenChange"},{t:"op",v:"={c =>"},{t:"fn",v:" onClose"},{t:"op",v:"}> "}] },
+  { tokens: [{t:"op",v:"      <"},{t:"fn",v:"Command"},{t:"op",v:"."},{t:"fn",v:"Input"},] },
+  { tokens: [{t:"pl",v:"        ref"},{t:"op",v:"={"},{t:"pl",v:"inputRef"},{t:"op",v:"}"}] },
+  { tokens: [{t:"pl",v:"        value"},{t:"op",v:"={"},{t:"pl",v:"query"},{t:"op",v:"}"}] },
+  { tokens: [{t:"pl",v:"        onValueChange"},{t:"op",v:"={"},{t:"pl",v:"setQuery"},{t:"op",v:"}"}] },
+  { tokens: [{t:"op",v:"      />"}] },
+];
+
+function CodeTab() {
+  const [copied, setCopied] = useState(false);
+  const doCopy = () => { setCopied(true); setTimeout(()=>setCopied(false), 1800); };
+  return (
+    <div style={{height:"100%",display:"flex",flexDirection:"column",border:"1px solid var(--border-subtle)",borderRadius:8,overflow:"hidden",background:"var(--bg-canvas)"}}>
+      {/* File tabs */}
+      <div style={{display:"flex",alignItems:"center",gap:0,borderBottom:"1px solid var(--border-subtle)",background:"var(--bg-surface)",padding:"0 12px"}}>
+        {["command-palette.tsx","types.ts"].map((f,i)=>(
+          <div key={f} style={{padding:"10px 14px",font:"500 12px monospace",color:i===0?"var(--fg-primary)":"var(--fg-muted)",borderBottom:i===0?"2px solid var(--accent)":"2px solid transparent",cursor:"pointer"}}>{f}</div>
+        ))}
+        <div style={{flex:1}}/>
+        <GhostBtn icon={copied?IC.check:IC.copy} onClick={doCopy}>{copied?"Copied":"Copy"}</GhostBtn>
+        <div style={{width:8}}/>
+        <GhostBtn icon={IC.download}>Download</GhostBtn>
+      </div>
+      {/* Code */}
+      <div style={{flex:1,overflow:"auto",padding:"16px 0",fontFamily:"'Geist Mono',monospace",fontSize:13,lineHeight:1.7,background:"var(--bg-canvas)"}}>
+        {CODE_LINES.map((line,i)=>(
+          <div key={i} style={{display:"flex",alignItems:"baseline",padding:"0 16px 0 0",minHeight:"1.7em"}}
+            onMouseEnter={e=>e.currentTarget.style.background="rgba(255,255,255,0.02)"}
+            onMouseLeave={e=>e.currentTarget.style.background="transparent"}
+          >
+            <span style={{width:42,textAlign:"right",paddingRight:20,font:"400 12px monospace",color:"var(--fg-muted)",flexShrink:0,userSelect:"none"}}>{i+1}</span>
+            <span style={{whiteSpace:"pre"}}>
+              {line.tokens.length===0?" ":line.tokens.map((tok,j)=>(
+                <span key={j} className={`tok-${tok.t}`}>{tok.v}</span>
+              ))}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ─── DEPENDENCIES TAB ─── */
+function DepsTab() {
+  const deps = [
+    { name:"@radix-ui/react-dialog", version:"^1.0.5", pinned:false, desc:"Accessible dialog primitive" },
+    { name:"@radix-ui/react-slot",   version:"^1.0.2", pinned:true,  desc:"Slot composition utility" },
+    { name:"cmdk",                    version:"^0.2.0", pinned:false, desc:"Command menu component" },
+    { name:"framer-motion",           version:"^11.0.0",pinned:false, desc:"Animation library" },
+    { name:"clsx",                    version:"2.1.0",  pinned:true,  desc:"Classnames utility" },
+  ];
+  return (
+    <div>
+      <div style={{display:"flex",alignItems:"center",gap:10,padding:"12px 0 16px",borderBottom:"1px solid var(--border-subtle)",marginBottom:12}}>
+        <div style={{display:"inline-flex",alignItems:"center",gap:6,padding:"4px 12px",borderRadius:6,background:"rgba(245,158,11,0.1)",border:"1px solid rgba(245,158,11,0.2)",font:"500 12px var(--font-ui)",color:"var(--warn)"}}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          3 unpinned versions
+        </div>
+        <button style={{height:28,padding:"0 12px",borderRadius:6,background:"var(--accent)",color:"#fff",border:"none",font:"500 12px var(--font-ui)"}}>Pin all</button>
+      </div>
+      <div style={{display:"flex",flexDirection:"column",gap:2}}>
+        {deps.map(d=>(
+          <div key={d.name} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 12px",borderRadius:6,background:"var(--bg-surface)",border:"1px solid var(--border-subtle)"}}>
+            <div style={{width:8,height:8,borderRadius:"50%",flexShrink:0,background:d.pinned?"var(--success)":"var(--warn)"}}/>
+            <div style={{flex:1,minWidth:0}}>
+              <span style={{font:"500 13px monospace",color:"var(--fg-primary)"}}>{d.name}</span>
+              <span style={{font:"400 12px var(--font-ui)",color:"var(--fg-muted)",marginLeft:8}}>{d.desc}</span>
+            </div>
+            <span style={{font:"500 12px monospace",color:d.pinned?"var(--fg-secondary)":"var(--warn)",background:d.pinned?"var(--bg-elevated)":"rgba(245,158,11,0.08)",border:`1px solid ${d.pinned?"var(--border-subtle)":"rgba(245,158,11,0.2)"}`,padding:"2px 8px",borderRadius:4}}>{d.version}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ─── DISCUSSION TAB ─── */
+function DiscussionTab() {
+  const comments = [
+    { author:"priya_ui", name:"Priya Sharma",  time:"1h ago",  text:"Loved this implementation — could you add focus trap support for nested dialogs?" },
+    { author:"felix",    name:"Felix Bauer",   time:"3h ago",  text:"v3 is so much cleaner. The fuzzy match algorithm is exactly what I needed." },
+    { author:"luiz",     name:"Luiz Felipe",   time:"4h ago",  text:"Thanks! Focus trap is already in the roadmap for v3.1. PR welcome if you want to contribute.", isAuthor:true },
+    { author:"anya",     name:"Anya Volkov",   time:"yesterday",text:"The Esc key behavior is perfect. One thing — could the backdrop be opt-out?" },
+  ];
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:0}}>
+      <div style={{borderBottom:"1px solid var(--border-subtle)",padding:"0 0 16px",marginBottom:16,display:"flex",gap:10}}>
+        <Av name="Y" size={32} color="#A31F37" />
+        <div style={{flex:1,background:"var(--bg-surface)",border:"1px solid var(--border-subtle)",borderRadius:8,padding:"10px 14px",font:"400 13px var(--font-ui)",color:"var(--fg-muted)"}}>Leave a comment…</div>
+      </div>
+      {comments.map((c,i)=>(
+        <div key={i} style={{display:"flex",gap:10,padding:"14px 0",borderBottom:"1px solid var(--border-subtle)"}}>
+          <Av name={c.name} size={32} />
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
+              <span style={{font:"600 13px var(--font-ui)",color:"var(--fg-primary)"}}>{c.name}</span>
+              {c.isAuthor&&<span style={{padding:"1px 6px",borderRadius:4,font:"500 10px var(--font-ui)",background:"var(--accent-muted)",color:"var(--accent)",border:"1px solid var(--accent)",letterSpacing:"0.04em",textTransform:"uppercase"}}>author</span>}
+              <span style={{font:"400 12px monospace",color:"var(--fg-muted)",marginLeft:"auto"}}>{c.time}</span>
+            </div>
+            <p style={{font:"400 13px var(--font-ui)",color:"var(--fg-secondary)",lineHeight:1.55,margin:0}}>{c.text}</p>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ─── PREVIEW TAB ─── */
+function PreviewTab() {
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:12}}>
+      <div style={{position:"relative",border:"1px solid var(--border-subtle)",borderRadius:8,overflow:"hidden"}}>
+        <div style={{padding:"6px 12px",borderBottom:"1px solid var(--border-subtle)",display:"flex",alignItems:"center",gap:8,background:"var(--bg-surface)"}}>
+          <div style={{width:9,height:9,borderRadius:"50%",background:"#F87171"}}/>
+          <div style={{width:9,height:9,borderRadius:"50%",background:"var(--warn)"}}/>
+          <div style={{width:9,height:9,borderRadius:"50%",background:"var(--success)"}}/>
+          <span style={{marginLeft:8,font:"400 11px monospace",color:"var(--fg-muted)",flex:1}}>componi.app/preview/command-palette</span>
+          <span style={{display:"inline-flex",alignItems:"center",gap:4,font:"400 11px monospace",color:"var(--success)"}}>
+            <span style={{width:7,height:7,borderRadius:"50%",background:"var(--success)"}}/>
+            180ms · 0 errors
+          </span>
+          <GhostBtn icon={IC.externalLink} />
+        </div>
+        <div style={{height:340}}>
+          <HeroPreview/>
+        </div>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12}}>
+        {[{l:"Renders in",v:"180ms"},{l:"Bundle size",v:"4.2kb gz"},{l:"Zero errors",v:"✓ clean"}].map(s=>(
+          <div key={s.l} style={{padding:"12px 14px",background:"var(--bg-surface)",border:"1px solid var(--border-subtle)",borderRadius:8}}>
+            <div style={{font:"500 10px var(--font-ui)",letterSpacing:"0.08em",textTransform:"uppercase",color:"var(--fg-muted)",marginBottom:4}}>{s.l}</div>
+            <div style={{font:"600 18px var(--font-ui)",color:"var(--fg-primary)"}}>{s.v}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ─── SIDEBAR ─── */
+function LeftSidebar({ theme, toggleTheme }) {
+  const [cur, setCur] = useState("explore");
+  const navItems = [
+    { k:"home",    icon:IC.home,    label:"Home",          href:"Home Feed.html" },
+    { k:"explore", icon:IC.compass, label:"Explore" },
+    { k:"notifs",  icon:IC.bell,    label:"Notifications", badge:3 },
+    { k:"profile", icon:IC.user,    label:"Profile" },
+    { k:"settings",icon:IC.settings,label:"Settings" },
+  ];
+  return (
+    <aside style={{width:240,flexShrink:0,borderRight:"1px solid var(--border-subtle)",display:"flex",flexDirection:"column",position:"sticky",top:0,height:"100vh",padding:"20px 12px",background:"var(--bg-canvas)",overflowY:"auto"}}>
+      <div style={{padding:"4px 12px 20px"}}>
+        <a href="Home Feed.html"><Logo size={20}/></a>
+      </div>
+      <nav style={{display:"flex",flexDirection:"column",gap:2}}>
+        {navItems.map(it=>(
+          <a key={it.k} href={it.href||"#"} onClick={e=>{ if(!it.href){e.preventDefault(); setCur(it.k);} }}
+            style={{display:"flex",alignItems:"center",gap:12,height:40,padding:"0 12px",borderRadius:8,background:cur===it.k?"var(--bg-elevated)":"transparent",color:cur===it.k?"var(--fg-primary)":"var(--fg-secondary)",font:`${cur===it.k?"600":"500"} 14px var(--font-ui)`,transition:"background 0.12s,color 0.12s",position:"relative"}}
+            onMouseEnter={e=>{ e.currentTarget.style.background="var(--bg-elevated)"; e.currentTarget.style.color="var(--fg-primary)"; }}
+            onMouseLeave={e=>{ e.currentTarget.style.background=cur===it.k?"var(--bg-elevated)":"transparent"; e.currentTarget.style.color=cur===it.k?"var(--fg-primary)":"var(--fg-secondary)"; }}
+          >
+            {React.cloneElement(it.icon,{width:18,height:18})}
+            <span>{it.label}</span>
+            {it.badge&&<span style={{marginLeft:"auto",minWidth:18,height:18,padding:"0 5px",background:"var(--accent)",color:"#fff",borderRadius:999,font:"600 10px monospace",display:"inline-flex",alignItems:"center",justifyContent:"center"}}>{it.badge}</span>}
+          </a>
+        ))}
+      </nav>
+      <button style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8,height:36,borderRadius:8,margin:"16px 0 0",background:"var(--accent)",color:"#fff",border:"none",font:"600 13px var(--font-ui)"}}>
+        {React.cloneElement(IC.plus,{width:16,height:16})} New component
+      </button>
+      <div style={{flex:1}}/>
+      <button onClick={toggleTheme} style={{display:"flex",alignItems:"center",gap:10,height:40,padding:"0 12px",borderRadius:8,background:"transparent",border:"none",color:"var(--fg-secondary)",font:"500 13px var(--font-ui)"}}
+        onMouseEnter={e=>e.currentTarget.style.background="var(--bg-elevated)"}
+        onMouseLeave={e=>e.currentTarget.style.background="transparent"}
+      >{theme==="dark"?IC.sun:IC.moon}<span>{theme==="dark"?"Light mode":"Dark mode"}</span></button>
+      <div style={{display:"flex",alignItems:"center",gap:10,padding:"12px",borderRadius:8,cursor:"pointer"}}
+        onMouseEnter={e=>e.currentTarget.style.background="var(--bg-elevated)"}
+        onMouseLeave={e=>e.currentTarget.style.background="transparent"}
+      >
+        <Av name="Y" size={32} color="#A31F37"/>
+        <div><div style={{font:"600 13px var(--font-ui)",color:"var(--fg-primary)"}}>You</div><div style={{font:"400 12px monospace",color:"var(--fg-muted)"}}>@yourhandle</div></div>
+      </div>
+    </aside>
+  );
+}
+
+/* ─── COMPONENT DETAIL ─── */
+const TABS = ["Preview","Code","Dependencies","Lineage","Discussion"];
+
+function ComponentDetail({ theme, toggleTheme }) {
+  const [tab, setTab] = useState(3); // Lineage by default
+  const [liked, setLiked] = useState(false);
+  const [likeCount, setLikeCount] = useState(1200);
+  const [following, setFollowing] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [mq, setMq] = useState(window.innerWidth);
+  const isDesktop = mq >= 1024;
+
+  useEffect(()=>{ const r=()=>setMq(window.innerWidth); window.addEventListener("resize",r); return ()=>window.removeEventListener("resize",r); },[]);
+
+  const doLike = () => { setLiked(v=>{setLikeCount(c=>c+(v?-1:1)); return !v;}); };
+  const doCopy = () => { setCopied(true); setTimeout(()=>setCopied(false), 1800); };
+
+  const tabContent = [
+    <PreviewTab/>,
+    <CodeTab/>,
+    <DepsTab/>,
+    <LineageTab/>,
+    <DiscussionTab/>,
+  ];
+
+  return (
+    <div style={{flex:1,display:"flex",flexDirection:"column",minWidth:0,overflow:"auto"}}>
+      {/* Breadcrumb + title */}
+      <div style={{padding:"20px 24px 0",display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+        <a href="Home Feed.html" style={{display:"inline-flex",alignItems:"center",color:"var(--fg-muted)",font:"400 13px monospace",gap:6}}>{IC.back}<span>Home</span></a>
+        <span style={{color:"var(--fg-muted)",font:"400 13px monospace"}}>/</span>
+        <span style={{font:"400 13px monospace",color:"var(--fg-muted)"}}>@luiz</span>
+        <span style={{color:"var(--fg-muted)"}}>/</span>
+        <span style={{font:"600 14px var(--font-ui)",color:"var(--fg-primary)"}}>command-palette</span>
+        <div style={{flex:1}}/>
+        <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+          <FwBadge fw="React"/>
+          <span style={{font:"400 12px monospace",color:"var(--fg-muted)"}}>v3.2 · MIT</span>
+          <GhostBtn icon={liked?IC.heartFill:IC.heart} onClick={doLike}><span style={{color:liked?"var(--accent)":"inherit"}}>{liked?likeCount+0:likeCount}</span></GhostBtn>
+          <GhostBtn icon={IC.fork}>Fork →</GhostBtn>
+          <button onClick={doCopy} style={{height:30,padding:"0 14px",borderRadius:6,background:"var(--accent)",color:"#fff",border:"none",font:"600 12px var(--font-ui)",display:"inline-flex",alignItems:"center",gap:6,transition:"background 0.12s"}}
+            onMouseEnter={e=>e.currentTarget.style.background="#A31F37"}
+            onMouseLeave={e=>e.currentTarget.style.background="var(--accent)"}
+          >{copied?IC.check:IC.copy}{copied?"Copied":"Copy install"}</button>
+        </div>
+      </div>
+
+      {/* Hero preview (top, visible always) */}
+      <div style={{padding:"20px 24px 0"}}>
+        <div style={{position:"relative",width:"100%",aspectRatio:"16/9",borderRadius:isDesktop?12:8,overflow:"hidden",border:"1px solid var(--border-subtle)"}}>
+          <HeroPreview/>
+          <div style={{position:"absolute",top:12,right:12,display:"flex",gap:6,alignItems:"center"}}>
+            <span style={{padding:"4px 10px",borderRadius:999,font:"500 11px monospace",background:"rgba(10,11,13,0.72)",color:"#F5F5F7",border:"1px solid rgba(255,255,255,0.08)",backdropFilter:"blur(8px)"}}>React · 5 deps</span>
+            <button style={{width:28,height:28,borderRadius:6,background:"rgba(10,11,13,0.72)",border:"1px solid rgba(255,255,255,0.08)",backdropFilter:"blur(8px)",color:"#F5F5F7",display:"inline-flex",alignItems:"center",justifyContent:"center"}}>
+              {IC.externalLink}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Tab bar */}
+      <div style={{padding:"0 24px",marginTop:20,borderBottom:"1px solid var(--border-subtle)",display:"flex",gap:0,overflowX:"auto",scrollbarWidth:"none"}}>
+        {TABS.map((t,i)=>(
+          <button key={t} onClick={()=>setTab(i)} style={{
+            padding:"10px 16px",background:"transparent",border:"none",
+            font:`${tab===i?"600":"500"} 13px var(--font-ui)`,
+            color:tab===i?"var(--fg-primary)":"var(--fg-muted)",
+            borderBottom:tab===i?"2px solid var(--accent)":"2px solid transparent",
+            transition:"color 0.12s",whiteSpace:"nowrap",cursor:"pointer",
+          }}>{t}</button>
+        ))}
+      </div>
+
+      {/* Two-column: tab content + side rail */}
+      <div style={{display:"grid",gridTemplateColumns:isDesktop?"1fr 280px":"1fr",gap:0,flex:1,padding:"24px",gap:isDesktop?32:0,minWidth:0}}>
+        {/* Tab content */}
+        <div style={{minWidth:0,overflow:"hidden"}}>
+          {tabContent[tab]}
+        </div>
+
+        {/* Side rail — desktop only */}
+        {isDesktop && (
+          <aside style={{display:"flex",flexDirection:"column",gap:16}}>
+            {/* Author card */}
+            <div style={{background:"var(--bg-surface)",border:"1px solid var(--border-subtle)",borderRadius:8,padding:16}}>
+              <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
+                <Av name="Luiz" size={44}/>
+                <div>
+                  <div style={{font:"600 14px var(--font-ui)",color:"var(--fg-primary)"}}>Luiz Felipe</div>
+                  <div style={{font:"400 12px monospace",color:"var(--fg-muted)"}}>@luiz</div>
+                </div>
+              </div>
+              <p style={{font:"400 13px var(--font-ui)",color:"var(--fg-secondary)",lineHeight:1.5,marginBottom:12}}>Design engineer. Building Componi.</p>
+              <button onClick={()=>setFollowing(v=>!v)} style={{
+                width:"100%",height:34,borderRadius:6,
+                background:following?"var(--accent)":"transparent",
+                color:following?"#fff":"var(--fg-primary)",
+                border:"1px solid var(--border-strong)",font:"600 13px var(--font-ui)",
+                transition:"all 0.12s",
+              }}>{following?"Following":"Follow"}</button>
+            </div>
+
+            {/* Metrics 2×2 */}
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+              {[{l:"Likes",v:"1.2k",icon:IC.heartFill},{l:"Forks",v:"89",icon:IC.fork},{l:"Favorites",v:"340"},{l:"Views",v:"14.5k"}].map(m=>(
+                <div key={m.l} style={{background:"var(--bg-surface)",border:"1px solid var(--border-subtle)",borderRadius:8,padding:"12px 14px"}}>
+                  <div style={{font:"500 10px var(--font-ui)",letterSpacing:"0.06em",textTransform:"uppercase",color:"var(--fg-muted)",marginBottom:4}}>{m.l}</div>
+                  <div style={{font:"600 18px var(--font-ui)",color:"var(--fg-primary)"}}>{m.v}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Tags */}
+            <div>
+              <div style={{font:"500 10px var(--font-ui)",letterSpacing:"0.06em",textTransform:"uppercase",color:"var(--fg-muted)",marginBottom:10}}>Tags</div>
+              <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                {["#search","#keyboard","#modal","#a11y"].map(t=>(
+                  <span key={t} style={{display:"inline-flex",alignItems:"center",height:24,padding:"0 10px",background:"var(--bg-elevated)",color:"var(--fg-secondary)",border:"1px solid var(--border-subtle)",borderRadius:4,font:"500 12px var(--font-ui)"}}>{t}</span>
+                ))}
+              </div>
+            </div>
+
+            {/* Version selector */}
+            <div>
+              <div style={{font:"500 10px var(--font-ui)",letterSpacing:"0.06em",textTransform:"uppercase",color:"var(--fg-muted)",marginBottom:8}}>Version</div>
+              <div style={{position:"relative"}}>
+                <select style={{width:"100%",height:34,padding:"0 12px",background:"var(--bg-surface)",border:"1px solid var(--border-strong)",borderRadius:6,color:"var(--fg-primary)",font:"500 13px var(--font-ui)",appearance:"none",cursor:"pointer"}}>
+                  <option>v3.2 (latest)</option>
+                  <option>v3.1</option>
+                  <option>v3.0</option>
+                  <option>v2.4</option>
+                </select>
+                <span style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",pointerEvents:"none",color:"var(--fg-muted)"}}>{IC.chevronDown}</span>
+              </div>
+            </div>
+
+            {/* Used by */}
+            <div>
+              <div style={{font:"500 10px var(--font-ui)",letterSpacing:"0.06em",textTransform:"uppercase",color:"var(--fg-muted)",marginBottom:10}}>Used by</div>
+              <div style={{display:"flex",alignItems:"center"}}>
+                {["Sarah","Carlos","Priya","Felix","Anya"].map((n,i)=>(
+                  <div key={n} style={{marginLeft:i===0?0:-6,zIndex:5-i}}>
+                    <Av name={n} size={26}/>
+                  </div>
+                ))}
+                <span style={{marginLeft:10,font:"400 12px monospace",color:"var(--fg-muted)"}}>+208 more</span>
+              </div>
+            </div>
+          </aside>
+        )}
+      </div>
+
+      {/* Mobile floating action bar */}
+      {!isDesktop && (
+        <div style={{position:"sticky",bottom:0,left:0,right:0,height:56,background:"var(--bg-surface)",borderTop:"1px solid var(--border-subtle)",display:"flex",alignItems:"stretch",zIndex:20}}>
+          {[
+            {label:liked?"Liked":"Like",icon:liked?IC.heartFill:IC.heart,onClick:doLike,accent:liked},
+            {label:"Fork →",icon:IC.fork,accent:true,primary:true},
+            {label:"Share",icon:IC.share},
+          ].map(a=>(
+            <button key={a.label} onClick={a.onClick} style={{
+              flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:8,
+              background:a.primary?"var(--accent)":"transparent",border:"none",
+              color:a.primary?"#fff":a.accent?"var(--accent)":"var(--fg-secondary)",
+              font:"600 13px var(--font-ui)",borderRight:"1px solid var(--border-subtle)",
+            }}>{a.icon}{a.label}</button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ─── Mobile TopBar ─── */
+function MobileTopBar({ theme, toggleTheme }) {
+  return (
+    <header style={{position:"sticky",top:0,zIndex:30,height:52,display:"flex",alignItems:"center",padding:"0 16px",gap:12,background:"var(--bg-canvas)",borderBottom:"1px solid var(--border-subtle)",backdropFilter:"blur(8px)"}}>
+      <a href="Home Feed.html"><Logo size={18}/></a>
+      <div style={{flex:1}}/>
+      <button onClick={toggleTheme} style={{width:40,height:40,display:"inline-flex",alignItems:"center",justifyContent:"center",background:"transparent",border:"none",color:"var(--fg-primary)",borderRadius:8}}>
+        {theme==="dark"?IC.sun:IC.moon}
+      </button>
+      <button style={{width:40,height:40,display:"inline-flex",alignItems:"center",justifyContent:"center",background:"transparent",border:"none",color:"var(--fg-primary)",borderRadius:8}}>
+        {IC.search}
+      </button>
+    </header>
+  );
+}
+
+/* ─── App ─── */
+function App() {
+  const [theme, setTheme] = useState(()=>{ try { return localStorage.getItem("componi-theme")||"dark"; } catch { return "dark"; }});
+  const [mq, setMq] = useState(window.innerWidth);
+  useEffect(()=>{ const r=()=>setMq(window.innerWidth); window.addEventListener("resize",r); return ()=>window.removeEventListener("resize",r); },[]);
+  const toggleTheme = () => {
+    const next = theme==="dark"?"light":"dark";
+    setTheme(next);
+    document.documentElement.setAttribute("data-theme",next);
+    try { localStorage.setItem("componi-theme",next); } catch {}
+  };
+  useEffect(()=>{ document.documentElement.setAttribute("data-theme",theme); },[theme]);
+
+  const isDesktop = mq >= 1024;
+
+  if (isDesktop) return (
+    <div style={{display:"flex",minHeight:"100vh",background:"var(--bg-canvas)"}}>
+      <LeftSidebar theme={theme} toggleTheme={toggleTheme}/>
+      <ComponentDetail theme={theme} toggleTheme={toggleTheme}/>
+    </div>
+  );
+
+  return (
+    <div style={{minHeight:"100vh",background:"var(--bg-canvas)",display:"flex",flexDirection:"column"}}>
+      <MobileTopBar theme={theme} toggleTheme={toggleTheme}/>
+      <ComponentDetail theme={theme} toggleTheme={toggleTheme}/>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>

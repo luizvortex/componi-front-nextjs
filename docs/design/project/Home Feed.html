@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html data-theme="dark" lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Home · Componi</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="tokens.css">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: var(--bg-canvas); color: var(--fg-primary); font-family: var(--font-ui); -webkit-font-smoothing: antialiased; }
+  button { font-family: inherit; cursor: pointer; }
+  a { text-decoration: none; color: inherit; }
+  *::-webkit-scrollbar { width: 5px; height: 5px; }
+  *::-webkit-scrollbar-track { background: transparent; }
+  *::-webkit-scrollbar-thumb { background: var(--border-subtle); border-radius: 4px; }
+  button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script type="text/babel">
+const { useState, useEffect, useRef } = React;
+
+/* ─── ICONS ─── */
+const IC = {
+  heartFill:    <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>,
+  heart:        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>,
+  msg:          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>,
+  fork:         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.59 13.51 6.83 3.98M15.41 6.51l-6.82 3.98"/></svg>,
+  share:        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>,
+  bookmark:     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="m19 21-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>,
+  bookmarkFill: <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="m19 21-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>,
+  search:       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>,
+  bell:         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>,
+  home:         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>,
+  homeFill:     <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>,
+  compass:      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>,
+  plus:         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>,
+  plusSq:       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>,
+  homeMob:      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>,
+  homeMobFill:  <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>,
+  compassMob:   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>,
+  bellMob:      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>,
+  trending:     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>,
+  user:         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>,
+  settings:     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>,
+  sun:          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>,
+  moon:         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>,
+  more:         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>,
+};
+
+/* ─── Helpers ─── */
+const AV_PALETTE = ["#A31F37","#4F46E5","#0EA5E9","#10B981","#D97706","#7C3AED","#DB2777","#059669"];
+function avColor(n=""){ let h=0; for(let i=0;i<n.length;i++) h=(h*31+n.charCodeAt(i))>>>0; return AV_PALETTE[h%AV_PALETTE.length]; }
+function fmtNum(n){ return n>=1000?`${(n/1000).toFixed(1)}k`:String(n); }
+
+function Logo({ size=18 }) {
+  return (
+    <div style={{display:"inline-flex",alignItems:"baseline",font:`600 ${size}px var(--font-ui)`,letterSpacing:"-0.04em",color:"var(--fg-primary)",userSelect:"none"}}>
+      compon<span style={{display:"inline-block",position:"relative"}}>i<span style={{position:"absolute",left:`${size*0.15}px`,top:`${size*0.15}px`,width:`${Math.max(4,size*0.2)}px`,height:`${Math.max(4,size*0.2)}px`,background:"var(--accent)",borderRadius:"1px"}}/></span>
+    </div>
+  );
+}
+
+function Av({ name="M", size=36, color, ring=false, ringColor="var(--accent)", gap=2 }) {
+  const c = color || avColor(name);
+  return (
+    <div style={{
+      width:size, height:size, borderRadius:"50%", flexShrink:0,
+      background:`linear-gradient(135deg,${c} 0%,rgba(0,0,0,0.45) 100%)`,
+      display:"inline-flex",alignItems:"center",justifyContent:"center",
+      color:"#fff",font:`600 ${Math.round(size*0.42)}px var(--font-ui)`,
+      outline: ring ? `2px solid ${ringColor}` : "none",
+      outlineOffset: gap,
+    }}>{name[0]?.toUpperCase()}</div>
+  );
+}
+
+/* ─── Preview art ─── */
+const POST_PREVIEWS = [
+  ({h}) => (
+    <div style={{width:"100%",height:h,background:"radial-gradient(circle at 55% 40%,#1A1D24 0%,#0A0B0D 70%)",display:"flex",alignItems:"center",justifyContent:"center"}}>
+      <div style={{width:"72%",maxWidth:340,background:"#12141A",border:"1px solid #2E323B",borderRadius:10,overflow:"hidden",boxShadow:"0 20px 60px rgba(0,0,0,0.6)"}}>
+        <div style={{padding:"10px 14px",borderBottom:"1px solid #23262D",display:"flex",alignItems:"center",gap:8}}>
+          <div style={{width:14,height:14,borderRadius:"50%",border:"1.5px solid #71717A",opacity:0.5}}/>
+          <div style={{flex:1,height:4,background:"#2E323B",borderRadius:2}}/>
+          <span style={{font:"500 10px 'Geist Mono',monospace",color:"#71717A",padding:"2px 5px",background:"#1A1D24",borderRadius:3,border:"1px solid #23262D"}}>⌘K</span>
+        </div>
+        {[{a:true},{a:false},{a:false}].map((r,i)=>(
+          <div key={i} style={{padding:"9px 14px",display:"flex",alignItems:"center",gap:8,background:r.a?"#3D0B14":"transparent",borderLeft:r.a?"2px solid #8B1A2F":"2px solid transparent"}}>
+            <div style={{width:7,height:7,borderRadius:"50%",background:r.a?"#8B1A2F":"#2E323B"}}/>
+            <div style={{flex:1,height:4,background:r.a?"#8B1A2F":"#23262D",borderRadius:2}}/>
+            {r.a && <span style={{font:"500 9px monospace",padding:"1px 5px",borderRadius:3,background:"#1A1D24",border:"1px solid #23262D",color:"#71717A"}}>⏎</span>}
+          </div>
+        ))}
+        <div style={{padding:"7px 14px",borderTop:"1px solid #23262D",display:"flex",gap:12}}>
+          {["↑↓ nav","⏎ open","Esc close"].map(k=><span key={k} style={{font:"400 9px monospace",color:"#71717A"}}>{k}</span>)}
+        </div>
+      </div>
+    </div>
+  ),
+  ({h}) => (
+    <div style={{width:"100%",height:h,background:"linear-gradient(135deg,#12141A 0%,#1A1D24 100%)",display:"flex",alignItems:"center",justifyContent:"center"}}>
+      <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:24,width:"75%"}}>
+        <div style={{width:"100%",height:2,background:"#1A1D24",borderRadius:2,position:"relative"}}>
+          <div style={{position:"absolute",left:"25%",width:"25%",height:"100%",background:"#8B1A2F",borderRadius:2,boxShadow:"0 0 12px rgba(139,26,47,0.7)"}}/>
+        </div>
+        <div style={{display:"flex",gap:4,padding:"5px",background:"rgba(10,11,13,0.6)",border:"1px solid #23262D",borderRadius:999}}>
+          {["Feed","Search","Inbox","Profile"].map((l,i)=>(
+            <div key={i} style={{padding:"8px 16px",borderRadius:999,font:"500 12px var(--font-ui)",background:i===1?"#8B1A2F":"transparent",color:i===1?"#fff":"#A1A1AA"}}>{l}</div>
+          ))}
+        </div>
+      </div>
+    </div>
+  ),
+  ({h}) => (
+    <div style={{width:"100%",height:h,background:"linear-gradient(135deg,#0A0B0D 0%,#12141A 100%)",display:"flex",alignItems:"center",justifyContent:"center"}}>
+      <div style={{width:"68%",maxWidth:270,padding:20,background:"#12141A",border:"1px solid #23262D",borderRadius:10}}>
+        <div style={{display:"flex",gap:5,marginBottom:14}}>
+          {[1,2,3].map(i=><div key={i} style={{flex:1,height:3,borderRadius:2,background:i<=2?"#8B1A2F":"#2E323B"}}/>)}
+        </div>
+        <div style={{font:"500 9px var(--font-ui)",color:"#71717A",letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:8}}>Step 2 of 3</div>
+        {["Full name","Email address","Password"].map((l,i)=>(
+          <div key={i} style={{marginBottom:7}}>
+            <div style={{font:"500 9px var(--font-ui)",color:"#A1A1AA",marginBottom:3}}>{l}</div>
+            <div style={{height:26,background:"#1A1D24",border:`1px solid ${i===1?"#8B1A2F":"#23262D"}`,borderRadius:5}}/>
+          </div>
+        ))}
+        <div style={{height:28,background:"#8B1A2F",borderRadius:5,marginTop:10,display:"flex",alignItems:"center",justifyContent:"center",font:"600 11px var(--font-ui)",color:"#fff"}}>Continue →</div>
+      </div>
+    </div>
+  ),
+];
+
+/* ─── DATA ─── */
+const STORIES = [
+  { handle:"sarah_dev", name:"Sarah",  unread:true },
+  { handle:"carlosm",   name:"Carlos", unread:false },
+  { handle:"priya_ui",  name:"Priya",  unread:true },
+  { handle:"felix",     name:"Felix",  unread:false },
+  { handle:"anya",      name:"Anya",   unread:false },
+];
+
+const POSTS = [
+  { id:1, author:"luiz",     name:"Luiz Felipe",   time:"2h ago",   title:"Command Palette",  fw:"React",  seed:0, likes:1200, comments:34, forks:89, tags:["search","keyboard","modal"],   liked:true },
+  { id:2, author:"sarah_dev",name:"Sarah Chen",    time:"5h ago",   title:"Animated Tab Bar", fw:"React",  seed:1, likes:876,  comments:21, forks:45, tags:["animation","tabs","framer"],  liked:false },
+  { id:3, author:"carlosm",  name:"Carlos Mendes", time:"yesterday",title:"Multi-Step Form",  fw:"Vue",    seed:2, likes:543,  comments:12, forks:23, tags:["forms","validation"],          liked:false },
+];
+
+const TRENDING = [
+  { rank:1, name:"command-palette",  author:"luiz",      likes:1200 },
+  { rank:2, name:"animated-tab-bar", author:"sarah_dev", likes:876 },
+  { rank:3, name:"toast-stack",      author:"felix",     likes:543 },
+  { rank:4, name:"data-table",       author:"priya_ui",  likes:412 },
+  { rank:5, name:"glass-card",       author:"kenji",     likes:310 },
+];
+
+const SUGGESTIONS = [
+  { name:"Sera Vaughn",  handle:"sera",  bio:"shadcn maintainer" },
+  { name:"Otis Park",    handle:"otis",  bio:"design-engineer at Resolve" },
+  { name:"Lin Ko",       handle:"lin",   bio:"dataviz components" },
+];
+
+/* ─── Stories Row ─── */
+function StoriesRow() {
+  return (
+    <div style={{
+      display:"flex",gap:16,overflowX:"auto",padding:"14px 16px",
+      borderBottom:"1px solid var(--border-subtle)",scrollbarWidth:"none",
+    }}>
+      <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:5,flexShrink:0,cursor:"pointer"}}>
+        <div style={{position:"relative"}}>
+          <div style={{width:58,height:58,borderRadius:"50%",border:"2px dashed var(--border-strong)",background:"var(--bg-elevated)",display:"flex",alignItems:"center",justifyContent:"center",color:"var(--fg-muted)"}}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          </div>
+          <div style={{position:"absolute",bottom:0,right:0,width:18,height:18,borderRadius:"50%",background:"var(--accent)",display:"flex",alignItems:"center",justifyContent:"center",border:"2px solid var(--bg-canvas)"}}>
+            <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          </div>
+        </div>
+        <span style={{font:"400 11px var(--font-ui)",color:"var(--fg-muted)"}}>You</span>
+      </div>
+      {STORIES.map(s=>(
+        <div key={s.handle} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:5,flexShrink:0,cursor:"pointer"}}>
+          <div style={{padding:2,borderRadius:"50%",background:s.unread?"var(--accent)":"transparent",border:s.unread?"none":"2px solid var(--border-subtle)"}}>
+            <div style={{width:54,height:54,borderRadius:"50%",background:`linear-gradient(135deg,${avColor(s.name)} 0%,rgba(0,0,0,0.4) 100%)`,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",font:"600 18px var(--font-ui)",border:"2px solid var(--bg-canvas)"}}>
+              {s.name[0]}
+            </div>
+          </div>
+          <span style={{font:"400 11px var(--font-ui)",color:"var(--fg-secondary)",maxWidth:62,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",textAlign:"center"}}>@{s.handle}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ─── Post ─── */
+function Post({ item, compact }) {
+  const [liked, setLiked] = useState(item.liked);
+  const [likeCount, setLikeCount] = useState(item.likes);
+  const [saved, setSaved] = useState(false);
+  const [showHeart, setShowHeart] = useState(false);
+  const lastTap = useRef(0);
+  const doLike = () => { setLiked(v => { setLikeCount(c => c+(v?-1:1)); return !v; }); };
+  const onImgTap = () => {
+    const now = Date.now();
+    if (now - lastTap.current < 350) {
+      if (!liked) { setLiked(true); setLikeCount(c=>c+1); }
+      setShowHeart(true); setTimeout(()=>setShowHeart(false), 800);
+    }
+    lastTap.current = now;
+  };
+  const PreviewCmp = POST_PREVIEWS[item.seed % POST_PREVIEWS.length];
+  const previewH = compact ? 260 : 300;
+
+  return (
+    <article style={{borderBottom:"1px solid var(--border-subtle)"}}>
+      {/* Header */}
+      <div style={{display:"flex",alignItems:"center",gap:10,padding:"12px 16px"}}>
+        <Av name={item.name} size={34} ring={liked} />
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{font:"600 13px var(--font-ui)",color:"var(--fg-primary)"}}>{item.name}</div>
+          <div style={{font:"400 12px var(--font-mono)",color:"var(--fg-muted)"}}>@{item.author} · {item.time}</div>
+        </div>
+        <span style={{padding:"3px 10px",borderRadius:999,font:"500 11px var(--font-mono)",background:"var(--bg-elevated)",color:"var(--fg-secondary)",border:"1px solid var(--border-subtle)"}}>{item.fw}</span>
+        <button style={{width:30,height:30,display:"inline-flex",alignItems:"center",justifyContent:"center",background:"transparent",border:"none",color:"var(--fg-muted)",borderRadius:6}}>{IC.more}</button>
+      </div>
+
+      {/* Preview */}
+      <div onClick={onImgTap} style={{position:"relative",width:"100%",cursor:"pointer",userSelect:"none"}}>
+        <PreviewCmp h={previewH} />
+        <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",pointerEvents:"none",opacity:showHeart?1:0,transition:"opacity 0.12s"}}>
+          <div style={{transform:showHeart?"scale(1)":"scale(0.5)",transition:"transform 0.15s cubic-bezier(0.34,1.56,0.64,1)",filter:"drop-shadow(0 2px 16px rgba(0,0,0,0.5))"}}>
+            <svg width="72" height="72" viewBox="0 0 24 24" fill="white" stroke="white" strokeWidth="0.5"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+          </div>
+        </div>
+      </div>
+
+      {/* Actions */}
+      <div style={{display:"flex",alignItems:"center",padding:"12px 16px 4px"}}>
+        <div style={{display:"flex",alignItems:"center",gap:18,flex:1}}>
+          <button onClick={doLike} style={{display:"inline-flex",alignItems:"center",gap:6,background:"transparent",border:"none",color:liked?"var(--accent)":"var(--fg-primary)",padding:0,transition:"transform 0.12s",}}
+            onMouseEnter={e=>e.currentTarget.style.transform="scale(1.1)"} onMouseLeave={e=>e.currentTarget.style.transform="scale(1)"}>
+            {liked?IC.heartFill:IC.heart}
+            <span style={{font:"500 13px var(--font-ui)",color:liked?"var(--accent)":"var(--fg-secondary)"}}>{fmtNum(likeCount)}</span>
+          </button>
+          <button style={{display:"inline-flex",alignItems:"center",gap:6,background:"transparent",border:"none",color:"var(--fg-primary)",padding:0}}>
+            {IC.msg}<span style={{font:"500 13px var(--font-ui)",color:"var(--fg-secondary)"}}>{item.comments}</span>
+          </button>
+          <button style={{display:"inline-flex",alignItems:"center",gap:6,background:"transparent",border:"none",color:"var(--fg-primary)",padding:0}}>
+            {IC.fork}<span style={{font:"500 13px var(--font-ui)",color:"var(--fg-secondary)"}}>{item.forks}</span>
+          </button>
+          <button style={{display:"inline-flex",alignItems:"center",justifyContent:"center",width:30,height:30,background:"transparent",border:"none",color:"var(--fg-primary)",padding:0}}>
+            {IC.share}
+          </button>
+        </div>
+        <button onClick={()=>setSaved(v=>!v)} style={{display:"inline-flex",alignItems:"center",justifyContent:"center",width:30,height:30,background:"transparent",border:"none",color:saved?"var(--accent)":"var(--fg-primary)",padding:0,transition:"color 0.12s"}}>
+          {saved?IC.bookmarkFill:IC.bookmark}
+        </button>
+      </div>
+
+      {/* Info */}
+      <div style={{padding:"4px 16px 14px"}}>
+        <div style={{font:"400 13px var(--font-ui)",color:"var(--fg-primary)",lineHeight:1.5}}>
+          <span style={{fontWeight:600}}>{item.name}</span>{"  "}{item.title}
+        </div>
+        <div style={{font:"400 13px var(--font-ui)",color:"var(--fg-secondary)",marginTop:2,lineHeight:1.45,overflow:"hidden",display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical"}}>
+          A polished {item.fw} component — production-ready, minimal deps.
+        </div>
+        <div style={{display:"flex",flexWrap:"wrap",gap:4,marginTop:6}}>
+          {item.tags.map(t=>(
+            <span key={t} style={{display:"inline-flex",alignItems:"center",height:20,padding:"0 8px",background:"var(--bg-elevated)",color:"var(--fg-secondary)",border:"1px solid var(--border-subtle)",borderRadius:4,font:"500 11px var(--font-ui)"}}>#{t}</span>
+          ))}
+        </div>
+        <div style={{font:"400 13px var(--font-ui)",color:"var(--fg-muted)",marginTop:6,cursor:"pointer"}}>View {item.comments} comments</div>
+        <div style={{font:"500 10px var(--font-ui)",color:"var(--fg-muted)",marginTop:3,letterSpacing:"0.08em",textTransform:"uppercase"}}>{item.time}</div>
+      </div>
+    </article>
+  );
+}
+
+/* ─── Mobile bottom nav ─── */
+function BottomNav() {
+  const [cur, setCur] = useState("home");
+  const items = [
+    { k:"home",   icon:(a)=>a?IC.homeMobFill:IC.homeMob },
+    { k:"explore",icon:()=>IC.compassMob },
+    { k:"new",    icon:()=>IC.plusSq },
+    { k:"notifs", icon:()=>IC.bellMob, badge:3 },
+    { k:"profile",icon:(a)=><Av name="Y" size={24} color="#A31F37" ring={a} ringColor="var(--accent)" gap={1}/> },
+  ];
+  return (
+    <nav style={{position:"fixed",bottom:0,left:0,right:0,height:58,display:"flex",alignItems:"center",justifyContent:"space-around",
+      background:"var(--bg-canvas)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",
+      borderTop:"1px solid var(--border-subtle)",zIndex:50}}>
+      {items.map(it=>(
+        <button key={it.k} onClick={()=>setCur(it.k)} aria-label={it.k}
+          style={{width:44,height:44,display:"inline-flex",alignItems:"center",justifyContent:"center",background:"transparent",border:"none",
+            color:cur===it.k?"var(--accent)":"var(--fg-primary)",borderRadius:8,position:"relative",transition:"color 0.12s"}}>
+          {it.icon(cur===it.k)}
+          {it.badge&&<span style={{position:"absolute",top:6,right:6,minWidth:16,height:16,padding:"0 3px",background:"var(--accent)",color:"#fff",borderRadius:999,font:"600 10px monospace",display:"inline-flex",alignItems:"center",justifyContent:"center",border:"2px solid var(--bg-canvas)"}}>{it.badge}</span>}
+        </button>
+      ))}
+    </nav>
+  );
+}
+
+/* ─── Desktop Left Sidebar ─── */
+function LeftSidebar({ theme, toggleTheme }) {
+  const [cur, setCur] = useState("home");
+  const [following, setFollowing] = useState({});
+  const navItems = [
+    { k:"home",    icon:IC.home,    label:"Home" },
+    { k:"explore", icon:IC.compass, label:"Explore" },
+    { k:"notifs",  icon:IC.bell,    label:"Notifications", badge:3 },
+    { k:"profile", icon:IC.user,    label:"Profile" },
+    { k:"settings",icon:IC.settings,label:"Settings" },
+  ];
+
+  return (
+    <aside style={{
+      width:240, flexShrink:0,
+      borderRight:"1px solid var(--border-subtle)",
+      display:"flex",flexDirection:"column",
+      position:"sticky",top:0,height:"100vh",
+      padding:"20px 12px",
+      background:"var(--bg-canvas)",
+      overflowY:"auto",
+    }}>
+      {/* Logo */}
+      <div style={{padding:"4px 12px 20px"}}>
+        <Logo size={20} />
+      </div>
+
+      {/* Nav items */}
+      <nav style={{display:"flex",flexDirection:"column",gap:2}}>
+        {navItems.map(it=>(
+          <button key={it.k} onClick={()=>setCur(it.k)}
+            style={{
+              display:"flex",alignItems:"center",gap:12,
+              height:40,padding:"0 12px",borderRadius:8,
+              background:cur===it.k?"var(--bg-elevated)":"transparent",
+              border:"none",
+              color:cur===it.k?"var(--fg-primary)":"var(--fg-secondary)",
+              font:`${cur===it.k?"600":"500"} 14px var(--font-ui)`,
+              transition:"background 0.12s, color 0.12s",
+              position:"relative",
+              textAlign:"left",
+            }}
+            onMouseEnter={e=>{ if(cur!==it.k){ e.currentTarget.style.background="var(--bg-elevated)"; e.currentTarget.style.color="var(--fg-primary)"; }}}
+            onMouseLeave={e=>{ if(cur!==it.k){ e.currentTarget.style.background="transparent"; e.currentTarget.style.color="var(--fg-secondary)"; }}}
+          >
+            {React.cloneElement(it.icon, {width:18,height:18})}
+            <span>{it.label}</span>
+            {it.badge&&<span style={{marginLeft:"auto",minWidth:18,height:18,padding:"0 5px",background:"var(--accent)",color:"#fff",borderRadius:999,font:"600 10px monospace",display:"inline-flex",alignItems:"center",justifyContent:"center"}}>{it.badge}</span>}
+          </button>
+        ))}
+      </nav>
+
+      {/* Publish button */}
+      <button style={{
+        display:"flex",alignItems:"center",justifyContent:"center",gap:8,
+        height:36,borderRadius:8,margin:"16px 0 0",
+        background:"var(--accent)",color:"#fff",border:"none",
+        font:"600 13px var(--font-ui)",transition:"background 0.12s",
+      }}
+        onMouseEnter={e=>e.currentTarget.style.background="#A31F37"}
+        onMouseLeave={e=>e.currentTarget.style.background="var(--accent)"}
+      >
+        {React.cloneElement(IC.plus,{width:16,height:16})} New component
+      </button>
+
+      <div style={{flex:1}}/>
+
+      {/* Theme toggle */}
+      <button onClick={toggleTheme}
+        style={{display:"flex",alignItems:"center",gap:10,height:40,padding:"0 12px",borderRadius:8,background:"transparent",border:"none",color:"var(--fg-secondary)",font:"500 13px var(--font-ui)",transition:"background 0.12s",}}
+        onMouseEnter={e=>e.currentTarget.style.background="var(--bg-elevated)"}
+        onMouseLeave={e=>e.currentTarget.style.background="transparent"}
+      >
+        {theme==="dark"?IC.sun:IC.moon}
+        <span>{theme==="dark"?"Light mode":"Dark mode"}</span>
+      </button>
+
+      {/* User avatar row */}
+      <div style={{display:"flex",alignItems:"center",gap:10,padding:"12px",borderRadius:8,marginTop:4,cursor:"pointer",background:"transparent",transition:"background 0.12s"}}
+        onMouseEnter={e=>e.currentTarget.style.background="var(--bg-elevated)"}
+        onMouseLeave={e=>e.currentTarget.style.background="transparent"}
+      >
+        <Av name="Y" size={32} color="#A31F37" />
+        <div style={{minWidth:0}}>
+          <div style={{font:"600 13px var(--font-ui)",color:"var(--fg-primary)"}}>You</div>
+          <div style={{font:"400 12px var(--font-mono)",color:"var(--fg-muted)"}}>@yourhandle</div>
+        </div>
+      </div>
+    </aside>
+  );
+}
+
+/* ─── Desktop Right Rail ─── */
+function RightRail() {
+  const [following, setFollowing] = useState({});
+  return (
+    <aside style={{
+      width:300,flexShrink:0,
+      borderLeft:"1px solid var(--border-subtle)",
+      padding:"24px 20px",
+      display:"flex",flexDirection:"column",gap:24,
+      position:"sticky",top:0,height:"100vh",
+      overflowY:"auto",
+      background:"var(--bg-canvas)",
+    }}>
+      {/* Search */}
+      <div style={{display:"flex",alignItems:"center",gap:8,height:36,padding:"0 12px",background:"var(--bg-surface)",border:"1px solid var(--border-subtle)",borderRadius:8,cursor:"text"}}>
+        {React.cloneElement(IC.search,{style:{color:"var(--fg-muted)",flexShrink:0}})}
+        <span style={{font:"400 13px var(--font-ui)",color:"var(--fg-muted)"}}>Search…</span>
+        <span style={{marginLeft:"auto",font:"500 11px monospace",padding:"1px 5px",borderRadius:3,background:"var(--bg-elevated)",border:"1px solid var(--border-subtle)",color:"var(--fg-secondary)"}}>⌘K</span>
+      </div>
+
+      {/* Trending */}
+      <section>
+        <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:14}}>
+          <span style={{color:"var(--accent)"}}>{React.cloneElement(IC.trending,{width:14,height:14})}</span>
+          <h3 style={{font:"600 13px var(--font-ui)",color:"var(--fg-primary)",flex:1}}>Trending this week</h3>
+          <a href="#" style={{font:"500 12px var(--font-ui)",color:"var(--fg-muted)"}}>See all</a>
+        </div>
+        <div style={{display:"flex",flexDirection:"column"}}>
+          {TRENDING.map((t,i)=>(
+            <a key={t.rank} href="#" style={{display:"grid",gridTemplateColumns:"22px 1fr auto",alignItems:"center",gap:10,padding:"9px 0",borderTop:i===0?"none":"1px solid var(--border-subtle)",textDecoration:"none"}}>
+              <span style={{font:"500 11px monospace",color:"var(--fg-muted)"}}>{String(t.rank).padStart(2,"0")}</span>
+              <div>
+                <div style={{font:"600 13px var(--font-ui)",color:"var(--fg-primary)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.name}</div>
+                <div style={{font:"400 11px monospace",color:"var(--fg-muted)"}}>@{t.author}</div>
+              </div>
+              <div style={{display:"inline-flex",alignItems:"center",gap:4,font:"500 11px monospace",color:"var(--fg-muted)"}}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+                {fmtNum(t.likes)}
+              </div>
+            </a>
+          ))}
+        </div>
+      </section>
+
+      {/* Suggestions */}
+      <section>
+        <div style={{display:"flex",alignItems:"center",marginBottom:14}}>
+          <h3 style={{font:"600 13px var(--font-ui)",color:"var(--fg-primary)",flex:1}}>Suggested creators</h3>
+          <a href="#" style={{font:"500 12px var(--font-ui)",color:"var(--fg-muted)"}}>See all</a>
+        </div>
+        <div style={{display:"flex",flexDirection:"column",gap:4}}>
+          {SUGGESTIONS.map((p,i)=>(
+            <div key={p.handle} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderTop:i===0?"none":"1px solid var(--border-subtle)"}}>
+              <Av name={p.name} size={34} />
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{font:"600 13px var(--font-ui)",color:"var(--fg-primary)"}}>{p.name}</div>
+                <div style={{font:"400 11px monospace",color:"var(--fg-muted)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>@{p.handle} · {p.bio}</div>
+              </div>
+              <button onClick={()=>setFollowing(f=>({...f,[p.handle]:!f[p.handle]}))}
+                style={{height:28,padding:"0 12px",borderRadius:6,border:"1px solid var(--border-strong)",
+                  background:following[p.handle]?"var(--accent)":"transparent",
+                  color:following[p.handle]?"#fff":"var(--fg-secondary)",
+                  font:"500 12px var(--font-ui)",flexShrink:0,transition:"all 0.12s"}}>
+                {following[p.handle]?"Following":"Follow"}
+              </button>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <div style={{font:"400 11px monospace",color:"var(--fg-muted)",display:"flex",flexWrap:"wrap",gap:8,marginTop:"auto"}}>
+        <a href="#" style={{color:"inherit"}}>About</a>
+        <a href="#" style={{color:"inherit"}}>Docs</a>
+        <a href="#" style={{color:"inherit"}}>API</a>
+        <a href="#" style={{color:"inherit"}}>Terms</a>
+        <span>· © Componi 2026</span>
+      </div>
+    </aside>
+  );
+}
+
+/* ─── Mobile TopBar ─── */
+function MobileTopBar({ theme, toggleTheme }) {
+  return (
+    <header style={{position:"sticky",top:0,zIndex:30,height:52,display:"flex",alignItems:"center",padding:"0 16px",gap:12,
+      background:"var(--bg-canvas)",borderBottom:"1px solid var(--border-subtle)",
+      backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)"}}>
+      <Logo size={18} />
+      <div style={{flex:1}}/>
+      <button onClick={toggleTheme} style={{width:40,height:40,display:"inline-flex",alignItems:"center",justifyContent:"center",background:"transparent",border:"none",color:"var(--fg-primary)",borderRadius:8}}>
+        {theme==="dark"?IC.sun:IC.moon}
+      </button>
+      <button style={{width:40,height:40,display:"inline-flex",alignItems:"center",justifyContent:"center",background:"transparent",border:"none",color:"var(--fg-primary)",borderRadius:8}}>
+        {IC.search}
+      </button>
+      <div style={{position:"relative"}}>
+        <button style={{width:40,height:40,display:"inline-flex",alignItems:"center",justifyContent:"center",background:"transparent",border:"none",color:"var(--fg-primary)",borderRadius:8}}>
+          {IC.bell}
+        </button>
+        <span style={{position:"absolute",top:7,right:7,minWidth:16,height:16,padding:"0 3px",background:"var(--accent)",color:"#fff",borderRadius:999,font:"600 10px monospace",display:"inline-flex",alignItems:"center",justifyContent:"center",border:"2px solid var(--bg-canvas)",pointerEvents:"none"}}>3</span>
+      </div>
+    </header>
+  );
+}
+
+/* ─── App ─── */
+function App() {
+  const [theme, setTheme] = useState(()=>{
+    try { return localStorage.getItem("componi-theme")||"dark"; } catch { return "dark"; }
+  });
+  const [mq, setMq] = useState(window.innerWidth);
+
+  useEffect(()=>{
+    const onR=()=>setMq(window.innerWidth);
+    window.addEventListener("resize",onR);
+    return ()=>window.removeEventListener("resize",onR);
+  },[]);
+
+  const toggleTheme = () => {
+    const next = theme==="dark"?"light":"dark";
+    setTheme(next);
+    document.documentElement.setAttribute("data-theme",next);
+    try { localStorage.setItem("componi-theme",next); } catch {}
+  };
+
+  useEffect(()=>{ document.documentElement.setAttribute("data-theme",theme); },[theme]);
+
+  const isDesktop = mq >= 1024;
+
+  /* ── DESKTOP layout ── */
+  if (isDesktop) return (
+    <div style={{display:"flex",minHeight:"100vh",background:"var(--bg-canvas)"}}>
+      <LeftSidebar theme={theme} toggleTheme={toggleTheme} />
+
+      {/* Center feed */}
+      <main style={{flex:1,maxWidth:560,minWidth:0,borderRight:"1px solid var(--border-subtle)"}}>
+        {/* mini topbar for center col */}
+        <div style={{position:"sticky",top:0,zIndex:20,height:52,display:"flex",alignItems:"center",
+          padding:"0 16px",borderBottom:"1px solid var(--border-subtle)",background:"var(--bg-canvas)",backdropFilter:"blur(8px)"}}>
+          <h2 style={{font:"600 15px var(--font-ui)",color:"var(--fg-primary)"}}>Following</h2>
+          <span style={{marginLeft:8,font:"400 12px monospace",color:"var(--fg-muted)"}}>· 147 today</span>
+        </div>
+
+        <StoriesRow />
+        {POSTS.map(p=><Post key={p.id} item={p} compact />)}
+        <div style={{padding:"24px 0",display:"flex",justifyContent:"center"}}>
+          <button style={{height:34,padding:"0 24px",borderRadius:6,background:"transparent",border:"1px solid var(--border-subtle)",color:"var(--fg-secondary)",font:"500 13px var(--font-ui)"}}>Load more</button>
+        </div>
+      </main>
+
+      <RightRail />
+    </div>
+  );
+
+  /* ── MOBILE layout ── */
+  return (
+    <div style={{minHeight:"100vh",background:"var(--bg-canvas)",display:"flex",flexDirection:"column"}}>
+      <MobileTopBar theme={theme} toggleTheme={toggleTheme} />
+      <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center"}}>
+        <div style={{width:"100%",maxWidth:480,paddingBottom:68}}>
+          <StoriesRow />
+          {POSTS.map(p=><Post key={p.id} item={p} />)}
+          <div style={{padding:"24px 0",display:"flex",justifyContent:"center"}}>
+            <button style={{height:34,padding:"0 24px",borderRadius:6,background:"transparent",border:"1px solid var(--border-subtle)",color:"var(--fg-secondary)",font:"500 13px var(--font-ui)"}}>Load more</button>
+          </div>
+        </div>
+      </div>
+      <BottomNav />
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>

@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mv src/components/detail/data.ts 'src/app/c/[handle]/[name]/components/data.ts')",
+      "Bash(mv components/detail/hero-preview.tsx 'src/app/c/[handle]/[name]/components/hero-preview.tsx')",
+      "Bash(mv components/detail/tabs/preview-tab.tsx 'src/app/c/[handle]/[name]/components/tabs/preview-tab.tsx')",
+      "Bash(mv components/detail/tabs/code-tab.tsx 'src/app/c/[handle]/[name]/components/tabs/code-tab.tsx')",
+      "Bash(mv components/detail/tabs/deps-tab.tsx 'src/app/c/[handle]/[name]/components/tabs/deps-tab.tsx')",
+      "Bash(npm run *)",
+      "Bash(echo \"started, pid=$!\")",
+      "Bash(curl -sf http://localhost:3000)",
+      "Read(//tmp/**)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:3000/c/luiz/command-palette)",
+      "Bash(curl -s http://localhost:3000)",
+      "Bash(curl -s http://localhost:3000/c/luiz/command-palette)",
+      "Bash(npx next *)",
+      "Bash(Get-ChildItem -Recurse -Force)",
+      "Bash(Select-Object -First 100)",
+      "Bash(Format-Table FullName)"
+    ]
+  }
+}

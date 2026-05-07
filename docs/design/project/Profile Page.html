@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html data-theme="dark" lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>@luiz · Componi</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="tokens.css">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: var(--bg-canvas); color: var(--fg-primary); font-family: var(--font-ui); -webkit-font-smoothing: antialiased; min-height: 100%; }
+  button { font-family: inherit; cursor: pointer; }
+  a { text-decoration: none; color: inherit; }
+  *::-webkit-scrollbar { width: 5px; height: 5px; }
+  *::-webkit-scrollbar-track { background: transparent; }
+  *::-webkit-scrollbar-thumb { background: var(--border-subtle); border-radius: 4px; }
+  button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+
+  .grid-3 {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+  }
+  @media (max-width: 900px) {
+    .grid-3 { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (max-width: 560px) {
+    .grid-3 { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+
+<script type="text/babel">
+const { useState, useEffect, useRef, useCallback } = React;
+
+/* ─── TWEAK DEFAULTS ─── */
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "theme": "dark",
+  "activeTab": "likes",
+  "followed": false,
+  "username": "luiz"
+}/*EDITMODE-END*/;
+
+/* ─── ICONS ─── */
+const IC = {
+  heart:    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>,
+  heartFill:<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>,
+  fork:     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.59 13.51 6.83 3.98M15.41 6.51l-6.82 3.98"/></svg>,
+  msg:      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>,
+  externalLink: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>,
+  more:     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>,
+  search:   <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>,
+  bell:     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>,
+  sun:      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>,
+  moon:     <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>,
+  home:     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>,
+  compass:  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>,
+  user:     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>,
+  settings: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>,
+  plus:     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>,
+  bookmark: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="m19 21-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>,
+};
+
+/* ─── Helpers ─── */
+const AV_PALETTE = ["#A31F37","#4F46E5","#0EA5E9","#10B981","#D97706","#7C3AED","#DB2777","#059669"];
+function avColor(n=""){ let h=0; for(let i=0;i<n.length;i++) h=(h*31+n.charCodeAt(i))>>>0; return AV_PALETTE[h%AV_PALETTE.length]; }
+function fmtNum(n){ return n>=1000?`${(n/1000).toFixed(1)}k`:String(n); }
+
+function Logo({ size=18 }) {
+  return (
+    <div style={{display:"inline-flex",alignItems:"baseline",font:`600 ${size}px var(--font-ui)`,letterSpacing:"-0.04em",color:"var(--fg-primary)",userSelect:"none"}}>
+      compon<span style={{display:"inline-block",position:"relative"}}>i<span style={{position:"absolute",left:`${size*0.15}px`,top:`${size*0.15}px`,width:`${Math.max(4,size*0.2)}px`,height:`${Math.max(4,size*0.2)}px`,background:"var(--accent)",borderRadius:"1px"}}/></span>
+    </div>
+  );
+}
+
+function Av({ name="?", size=36, color }) {
+  const c = color || avColor(name);
+  return (
+    <div style={{
+      width:size, height:size, borderRadius:"50%", flexShrink:0,
+      background:`linear-gradient(135deg,${c} 0%,rgba(0,0,0,0.4) 100%)`,
+      display:"inline-flex", alignItems:"center", justifyContent:"center",
+      color:"#fff", font:`600 ${Math.round(size*0.4)}px var(--font-ui)`,
+    }}>{name[0]?.toUpperCase()}</div>
+  );
+}
+
+/* ─── Component preview thumbnails ─── */
+const PREVIEWS = {
+  "Modal System": ({dark}) => (
+    <div style={{width:"100%",height:"100%",background:dark?"radial-gradient(circle at 50% 40%,#1A1D24,#0A0B0D)":"radial-gradient(circle at 50% 40%,#F0F0F5,#FAFAFA)",display:"flex",alignItems:"center",justifyContent:"center"}}>
+      <div style={{width:"68%",background:dark?"#12141A":"#fff",border:`1px solid ${dark?"#2E323B":"#E4E4E7"}`,borderRadius:8,overflow:"hidden",boxShadow:dark?"0 16px 48px rgba(0,0,0,0.6)":"0 8px 32px rgba(0,0,0,0.12)"}}>
+        <div style={{padding:"10px 12px",borderBottom:`1px solid ${dark?"#23262D":"#E4E4E7"}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <span style={{font:"600 10px var(--font-ui)",color:dark?"#F5F5F7":"#0A0A0A"}}>Confirm action</span>
+          <div style={{width:14,height:14,borderRadius:"50%",border:`1.5px solid ${dark?"#52525B":"#D4D4D8"}`}}/>
+        </div>
+        <div style={{padding:"10px 12px"}}>
+          <div style={{height:4,background:dark?"#23262D":"#E4E4E7",borderRadius:2,marginBottom:5,width:"90%"}}/>
+          <div style={{height:4,background:dark?"#23262D":"#E4E4E7",borderRadius:2,width:"60%"}}/>
+        </div>
+        <div style={{padding:"8px 12px",borderTop:`1px solid ${dark?"#23262D":"#E4E4E7"}`,display:"flex",justifyContent:"flex-end",gap:6}}>
+          <div style={{height:20,width:44,borderRadius:4,border:`1px solid ${dark?"#2E323B":"#D4D4D8"}`,background:"transparent"}}/>
+          <div style={{height:20,width:44,borderRadius:4,background:"#8B1A2F"}}/>
+        </div>
+      </div>
+    </div>
+  ),
+  "Tooltip": ({dark}) => (
+    <div style={{width:"100%",height:"100%",background:dark?"#0A0B0D":"#FAFAFA",display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:10}}>
+      <div style={{padding:"5px 10px",background:dark?"#1A1D24":"#18181B",borderRadius:5,boxShadow:"0 4px 12px rgba(0,0,0,0.3)",position:"relative"}}>
+        <span style={{font:"500 10px var(--font-ui)",color:"#fff"}}>Copy to clipboard</span>
+        <div style={{position:"absolute",bottom:-4,left:"50%",transform:"translateX(-50%)",width:0,height:0,borderLeft:"4px solid transparent",borderRight:"4px solid transparent",borderTop:`4px solid ${dark?"#1A1D24":"#18181B"}`}}/>
+      </div>
+      <div style={{height:28,width:28,borderRadius:6,background:dark?"#23262D":"#E4E4E7",display:"flex",alignItems:"center",justifyContent:"center"}}>
+        <div style={{width:12,height:12,border:`1.5px solid ${dark?"#71717A":"#A1A1AA"}`,borderRadius:2}}/>
+      </div>
+    </div>
+  ),
+  "Sidebar Nav": ({dark}) => (
+    <div style={{width:"100%",height:"100%",background:dark?"#0A0B0D":"#FAFAFA",display:"flex",padding:"10px"}}>
+      <div style={{width:80,background:dark?"#12141A":"#fff",border:`1px solid ${dark?"#23262D":"#E4E4E7"}`,borderRadius:6,padding:"8px 6px",display:"flex",flexDirection:"column",gap:3}}>
+        {["Home","Search","Feed","Profile","Settings"].map((l,i)=>(
+          <div key={i} style={{height:18,borderRadius:4,padding:"0 6px",display:"flex",alignItems:"center",background:i===0?(dark?"#3D0B14":"#FFF0F0"):"transparent",borderLeft:i===0?"2px solid #8B1A2F":"2px solid transparent"}}>
+            <div style={{height:3,flex:1,background:i===0?"#8B1A2F":(dark?"#23262D":"#E4E4E7"),borderRadius:2}}/>
+          </div>
+        ))}
+      </div>
+    </div>
+  ),
+  "Badge": ({dark}) => (
+    <div style={{width:"100%",height:"100%",background:dark?"#0A0B0D":"#FAFAFA",display:"flex",alignItems:"center",justifyContent:"center",flexWrap:"wrap",gap:6,padding:12}}>
+      {[["New","#8B1A2F","#3D0B14"],["Beta","#4F46E5","rgba(79,70,229,0.15)"],["Live","#10B981","rgba(16,185,129,0.15)"],["Deprecated","#71717A","rgba(113,113,122,0.12)"]].map(([l,fg,bg])=>(
+        <span key={l} style={{padding:"2px 8px",borderRadius:999,font:"600 9px var(--font-ui)",color:fg,background:bg,border:`1px solid ${fg}30`}}>{l}</span>
+      ))}
+    </div>
+  ),
+  "Skeleton Loader": ({dark}) => (
+    <div style={{width:"100%",height:"100%",background:dark?"#0A0B0D":"#FAFAFA",display:"flex",flexDirection:"column",gap:8,padding:"12px 14px",justifyContent:"center"}}>
+      {[1,2,3].map(i=>(
+        <div key={i} style={{display:"flex",gap:8,alignItems:"center"}}>
+          <div style={{width:28,height:28,borderRadius:"50%",background:dark?"#1A1D24":"#E4E4E7"}}/>
+          <div style={{flex:1,display:"flex",flexDirection:"column",gap:4}}>
+            <div style={{height:7,background:dark?"#1A1D24":"#E4E4E7",borderRadius:3,width:`${[85,70,90][i-1]}%`}}/>
+            <div style={{height:5,background:dark?"#23262D":"#F4F4F5",borderRadius:3,width:`${[55,45,60][i-1]}%`}}/>
+          </div>
+        </div>
+      ))}
+    </div>
+  ),
+  "Dropdown Menu": ({dark}) => (
+    <div style={{width:"100%",height:"100%",background:dark?"#0A0B0D":"#FAFAFA",display:"flex",alignItems:"center",justifyContent:"center"}}>
+      <div style={{width:"70%",background:dark?"#12141A":"#fff",border:`1px solid ${dark?"#2E323B":"#E4E4E7"}`,borderRadius:8,overflow:"hidden",boxShadow:dark?"0 12px 32px rgba(0,0,0,0.5)":"0 6px 20px rgba(0,0,0,0.1)"}}>
+        {["Edit","Duplicate","Archive","— ","Delete"].map((item,i)=>(
+          <div key={i} style={{padding:"7px 12px",borderTop:i===3?`1px solid ${dark?"#23262D":"#E4E4E7"}`:"none",background:i===0?(dark?"rgba(139,26,47,0.12)":"rgba(139,26,47,0.06)"):"transparent",display:"flex",alignItems:"center",gap:7}}>
+            {item!=="— "&&<div style={{width:10,height:10,borderRadius:2,border:`1.5px solid ${i===4?"#F87171":(dark?"#52525B":"#A1A1AA")}`}}/>}
+            {item!=="— "&&<span style={{font:`${i===0?"600":"400"} 10px var(--font-ui)`,color:i===4?"#F87171":(dark?"#A1A1AA":"#52525B")}}>{item}</span>}
+          </div>
+        ))}
+      </div>
+    </div>
+  ),
+  "Pagination": ({dark}) => (
+    <div style={{width:"100%",height:"100%",background:dark?"#0A0B0D":"#FAFAFA",display:"flex",alignItems:"center",justifyContent:"center"}}>
+      <div style={{display:"flex",gap:4,alignItems:"center"}}>
+        {["‹",...["1","2","3","…","8"],"›"].map((p,i)=>(
+          <div key={i} style={{
+            width:i===2?28:24, height:i===2?28:24,
+            borderRadius:5,
+            display:"flex",alignItems:"center",justifyContent:"center",
+            font:`${i===2?"600":"400"} ${i===2?"11":"10"}px var(--font-ui)`,
+            background:i===2?"#8B1A2F":(dark?"#1A1D24":"#F4F4F5"),
+            color:i===2?"#fff":(dark?"#71717A":"#71717A"),
+            border:`1px solid ${i===2?"#8B1A2F":(dark?"#23262D":"#E4E4E7")}`,
+          }}>{p}</div>
+        ))}
+      </div>
+    </div>
+  ),
+  "File Upload": ({dark}) => (
+    <div style={{width:"100%",height:"100%",background:dark?"#0A0B0D":"#FAFAFA",display:"flex",alignItems:"center",justifyContent:"center",padding:14}}>
+      <div style={{width:"100%",border:`1.5px dashed ${dark?"#2E323B":"#D4D4D8"}`,borderRadius:8,padding:"14px 10px",display:"flex",flexDirection:"column",alignItems:"center",gap:6,background:dark?"rgba(139,26,47,0.03)":"rgba(139,26,47,0.02)"}}>
+        <div style={{width:28,height:28,borderRadius:6,background:dark?"#1A1D24":"#F4F4F5",border:`1px solid ${dark?"#23262D":"#E4E4E7"}`,display:"flex",alignItems:"center",justifyContent:"center"}}>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={dark?"#71717A":"#A1A1AA"} strokeWidth="2" strokeLinecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        </div>
+        <span style={{font:"500 9px var(--font-ui)",color:dark?"#71717A":"#A1A1AA",textAlign:"center"}}>Drop files or click to browse</span>
+        <span style={{font:"400 8px var(--font-ui)",color:dark?"#52525B":"#D4D4D8"}}>PNG, JPG, SVG up to 10MB</span>
+      </div>
+    </div>
+  ),
+  "Avatar Group": ({dark}) => (
+    <div style={{width:"100%",height:"100%",background:dark?"#0A0B0D":"#FAFAFA",display:"flex",alignItems:"center",justifyContent:"center",gap:0}}>
+      {["Sarah","Carlos","Priya","Felix","+4"].map((n,i)=>(
+        <div key={i} style={{
+          width:36, height:36, borderRadius:"50%",
+          marginLeft: i===0?0:-10,
+          background: n.startsWith("+")?
+            (dark?"#1A1D24":"#F4F4F5"):
+            `linear-gradient(135deg,${avColor(n)} 0%,rgba(0,0,0,0.35) 100%)`,
+          border:`2.5px solid ${dark?"#0A0B0D":"#FAFAFA"}`,
+          display:"flex",alignItems:"center",justifyContent:"center",
+          font:`600 11px var(--font-ui)`,
+          color: n.startsWith("+")?
+            (dark?"#71717A":"#A1A1AA"):
+            "#fff",
+          zIndex:5-i,
+          position:"relative",
+        }}>{n.startsWith("+")?n:n[0]}</div>
+      ))}
+    </div>
+  ),
+};
+
+/* ─── Component data ─── */
+const COMPONENTS = [
+  { id:1,  name:"Modal System",    fw:"React",  tags:["overlay","dialog"], likes:312, comments:18, forks:44, forkedFrom:"olivia" },
+  { id:2,  name:"Tooltip",         fw:"React",  tags:["ui","hover"],       likes:198, comments:9,  forks:27, forkedFrom:"kenji" },
+  { id:3,  name:"Sidebar Nav",     fw:"Vue",    tags:["navigation","layout"],likes:445,comments:31, forks:62, forkedFrom:"sera" },
+  { id:4,  name:"Badge",           fw:"React",  tags:["status","label"],   likes:134, comments:5,  forks:19, forkedFrom:"otis" },
+  { id:5,  name:"Skeleton Loader", fw:"Svelte", tags:["loading","ux"],     likes:287, comments:14, forks:38, forkedFrom:"lin" },
+  { id:6,  name:"Dropdown Menu",   fw:"React",  tags:["menu","select"],    likes:521, comments:42, forks:73, forkedFrom:"felix" },
+  { id:7,  name:"Pagination",      fw:"React",  tags:["navigation","data"],likes:167, comments:7,  forks:22, forkedFrom:"sarah_dev" },
+  { id:8,  name:"File Upload",     fw:"Vue",    tags:["forms","input"],    likes:239, comments:16, forks:35, forkedFrom:"priya_ui" },
+  { id:9,  name:"Avatar Group",    fw:"React",  tags:["ui","users"],       likes:183, comments:11, forks:28, forkedFrom:"carlosm" },
+];
+
+/* ─── Compact Card ─── */
+function CompactCard({ item, isForks, dark }) {
+  const [liked, setLiked] = useState(false);
+  const PreviewCmp = PREVIEWS[item.name];
+  return (
+    <article style={{
+      background:"var(--bg-surface)",
+      border:"1px solid var(--border-subtle)",
+      borderRadius:8,
+      overflow:"hidden",
+      transition:"border-color 0.15s, box-shadow 0.15s",
+    }}
+      onMouseEnter={e=>{ e.currentTarget.style.borderColor="var(--border-strong)"; e.currentTarget.style.boxShadow="var(--shadow-card)"; }}
+      onMouseLeave={e=>{ e.currentTarget.style.borderColor="var(--border-subtle)"; e.currentTarget.style.boxShadow="none"; }}
+    >
+      {/* Preview thumbnail */}
+      <div style={{height:140, overflow:"hidden", borderBottom:"1px solid var(--border-subtle)"}}>
+        {PreviewCmp ? <PreviewCmp dark={dark} /> : (
+          <div style={{width:"100%",height:"100%",background:"var(--bg-elevated)",display:"flex",alignItems:"center",justifyContent:"center"}}>
+            <span style={{font:"400 11px var(--font-mono)",color:"var(--fg-muted)"}}>{item.name}</span>
+          </div>
+        )}
+      </div>
+
+      {/* Card body */}
+      <div style={{padding:"10px 12px 8px"}}>
+        {/* Title row */}
+        <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:6,marginBottom:isForks?2:6}}>
+          <div style={{minWidth:0}}>
+            <div style={{font:"600 13px var(--font-ui)",color:"var(--fg-primary)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{item.name}</div>
+            {isForks && (
+              <div style={{font:"400 11px var(--font-mono)",color:"var(--fg-muted)",marginTop:1}}>
+                forked from <span style={{color:"var(--accent-hover)",cursor:"pointer"}}>@{item.forkedFrom}</span>
+              </div>
+            )}
+          </div>
+          <span style={{
+            padding:"2px 7px", borderRadius:4, flexShrink:0,
+            font:"500 10px var(--font-mono)",
+            background:"var(--bg-elevated)",
+            color:"var(--fg-muted)",
+            border:"1px solid var(--border-subtle)",
+          }}>{item.fw}</span>
+        </div>
+
+        {/* Tags */}
+        <div style={{display:"flex",flexWrap:"wrap",gap:4,marginBottom:8}}>
+          {item.tags.map(t=>(
+            <span key={t} style={{
+              display:"inline-flex",alignItems:"center",
+              height:18,padding:"0 7px",
+              background:"var(--bg-elevated)",
+              color:"var(--fg-secondary)",
+              border:"1px solid var(--border-subtle)",
+              borderRadius:3,
+              font:"500 10px var(--font-ui)",
+            }}>#{t}</span>
+          ))}
+        </div>
+
+        {/* Actions row */}
+        <div style={{display:"flex",alignItems:"center",gap:0,borderTop:"1px solid var(--border-subtle)",paddingTop:8,marginTop:2}}>
+          <button
+            onClick={()=>setLiked(v=>!v)}
+            style={{
+              display:"inline-flex",alignItems:"center",gap:5,
+              background:"transparent",border:"none",padding:"0 8px 0 0",
+              color:liked?"var(--accent)":"var(--fg-muted)",
+              font:`500 12px var(--font-ui)`,
+              transition:"color 0.12s",
+            }}
+          >
+            {liked ? IC.heartFill : IC.heart}
+            <span>{fmtNum(item.likes + (liked?1:0))}</span>
+          </button>
+          <button style={{display:"inline-flex",alignItems:"center",gap:5,background:"transparent",border:"none",padding:"0 8px",color:"var(--fg-muted)",font:"500 12px var(--font-ui)"}}>
+            {IC.msg}<span>{item.comments}</span>
+          </button>
+          <button style={{display:"inline-flex",alignItems:"center",gap:5,background:"transparent",border:"none",padding:"0 8px",color:"var(--fg-muted)",font:"500 12px var(--font-ui)"}}>
+            {IC.fork}<span>{item.forks}</span>
+          </button>
+          <div style={{flex:1}}/>
+          <button style={{display:"inline-flex",alignItems:"center",justifyContent:"center",width:26,height:26,background:"transparent",border:"none",color:"var(--fg-muted)",borderRadius:4}}>
+            {IC.bookmark}
+          </button>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+/* ─── Left Sidebar ─── */
+function LeftSidebar({ theme, toggleTheme }) {
+  const [cur, setCur] = useState("profile");
+  const items = [
+    { k:"home",    icon:IC.home,    label:"Home" },
+    { k:"explore", icon:IC.compass, label:"Explore" },
+    { k:"notifs",  icon:IC.bell,    label:"Notifications", badge:3 },
+    { k:"profile", icon:IC.user,    label:"Profile" },
+    { k:"settings",icon:IC.settings,label:"Settings" },
+  ];
+  return (
+    <aside style={{
+      width:220, flexShrink:0,
+      borderRight:"1px solid var(--border-subtle)",
+      display:"flex", flexDirection:"column",
+      position:"sticky", top:0, height:"100vh",
+      padding:"20px 10px",
+      background:"var(--bg-canvas)",
+      overflowY:"auto",
+    }}>
+      <div style={{padding:"4px 10px 20px"}}><Logo size={18}/></div>
+      <nav style={{display:"flex",flexDirection:"column",gap:2}}>
+        {items.map(it=>(
+          <button key={it.k} onClick={()=>setCur(it.k)}
+            style={{
+              display:"flex",alignItems:"center",gap:11,
+              height:38,padding:"0 10px",borderRadius:7,
+              background:cur===it.k?"var(--bg-elevated)":"transparent",
+              border:"none",
+              color:cur===it.k?"var(--fg-primary)":"var(--fg-secondary)",
+              font:`${cur===it.k?"600":"500"} 13px var(--font-ui)`,
+              transition:"background 0.12s,color 0.12s",
+              position:"relative", textAlign:"left",
+            }}
+            onMouseEnter={e=>{ if(cur!==it.k){ e.currentTarget.style.background="var(--bg-elevated)"; e.currentTarget.style.color="var(--fg-primary)"; }}}
+            onMouseLeave={e=>{ if(cur!==it.k){ e.currentTarget.style.background="transparent"; e.currentTarget.style.color="var(--fg-secondary)"; }}}
+          >
+            {it.icon}
+            <span>{it.label}</span>
+            {it.badge&&<span style={{marginLeft:"auto",minWidth:17,height:17,padding:"0 4px",background:"var(--accent)",color:"#fff",borderRadius:999,font:"600 9px monospace",display:"inline-flex",alignItems:"center",justifyContent:"center"}}>{it.badge}</span>}
+          </button>
+        ))}
+      </nav>
+
+      <button style={{
+        display:"flex",alignItems:"center",justifyContent:"center",gap:7,
+        height:34,borderRadius:7,margin:"14px 0 0",
+        background:"var(--accent)",color:"#fff",border:"none",
+        font:"600 12px var(--font-ui)",transition:"background 0.12s",
+      }}
+        onMouseEnter={e=>e.currentTarget.style.background="var(--accent-hover)"}
+        onMouseLeave={e=>e.currentTarget.style.background="var(--accent)"}
+      >
+        {IC.plus} New component
+      </button>
+
+      <div style={{flex:1}}/>
+      <button onClick={toggleTheme}
+        style={{display:"flex",alignItems:"center",gap:9,height:38,padding:"0 10px",borderRadius:7,background:"transparent",border:"none",color:"var(--fg-secondary)",font:"500 12px var(--font-ui)",transition:"background 0.12s"}}
+        onMouseEnter={e=>e.currentTarget.style.background="var(--bg-elevated)"}
+        onMouseLeave={e=>e.currentTarget.style.background="transparent"}
+      >
+        {theme==="dark"?IC.sun:IC.moon}
+        <span>{theme==="dark"?"Light mode":"Dark mode"}</span>
+      </button>
+      <div style={{display:"flex",alignItems:"center",gap:9,padding:"10px",borderRadius:7,marginTop:3,cursor:"pointer"}}
+        onMouseEnter={e=>e.currentTarget.style.background="var(--bg-elevated)"}
+        onMouseLeave={e=>e.currentTarget.style.background="transparent"}
+      >
+        <Av name="You" size={30} color="#A31F37" />
+        <div style={{minWidth:0}}>
+          <div style={{font:"600 12px var(--font-ui)",color:"var(--fg-primary)"}}>You</div>
+          <div style={{font:"400 11px var(--font-mono)",color:"var(--fg-muted)"}}>@yourhandle</div>
+        </div>
+      </div>
+    </aside>
+  );
+}
+
+/* ─── Top bar (sticky) ─── */
+function TopBar({ theme, toggleTheme, username }) {
+  return (
+    <header style={{
+      position:"sticky",top:0,zIndex:40,height:48,
+      display:"flex",alignItems:"center",gap:10,padding:"0 16px",
+      background:"var(--bg-canvas)",borderBottom:"1px solid var(--border-subtle)",
+      backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)",
+    }}>
+      <Logo size={17}/>
+      <span style={{color:"var(--border-strong)",fontSize:13}}>/</span>
+      <span style={{font:"500 13px var(--font-mono)",color:"var(--fg-secondary)"}}>@{username}</span>
+      <div style={{flex:1}}/>
+      <button onClick={toggleTheme} style={{width:34,height:34,display:"inline-flex",alignItems:"center",justifyContent:"center",background:"transparent",border:"none",color:"var(--fg-secondary)",borderRadius:7,transition:"background 0.12s"}}
+        onMouseEnter={e=>e.currentTarget.style.background="var(--bg-elevated)"}
+        onMouseLeave={e=>e.currentTarget.style.background="transparent"}
+      >{theme==="dark"?IC.sun:IC.moon}</button>
+      <button style={{width:34,height:34,display:"inline-flex",alignItems:"center",justifyContent:"center",background:"transparent",border:"none",color:"var(--fg-secondary)",borderRadius:7,transition:"background 0.12s"}}
+        onMouseEnter={e=>e.currentTarget.style.background="var(--bg-elevated)"}
+        onMouseLeave={e=>e.currentTarget.style.background="transparent"}
+      >{IC.search}</button>
+      <div style={{position:"relative"}}>
+        <button style={{width:34,height:34,display:"inline-flex",alignItems:"center",justifyContent:"center",background:"transparent",border:"none",color:"var(--fg-secondary)",borderRadius:7}}>{IC.bell}</button>
+        <span style={{position:"absolute",top:7,right:7,width:7,height:7,background:"var(--accent)",borderRadius:"50%",border:"2px solid var(--bg-canvas)",pointerEvents:"none"}}/>
+      </div>
+      <Av name="You" size={28} color="#A31F37"/>
+    </header>
+  );
+}
+
+/* ─── Profile main content ─── */
+function ProfileMain({ theme, activeTab, setActiveTab, followed, setFollowed, username }) {
+  const dark = theme === "dark";
+  const isForks = activeTab === "forks";
+  const TABS = ["components","collections","likes","forks"];
+
+  const coverGradient = dark
+    ? "radial-gradient(ellipse at 30% 60%, #1A0A0D 0%, #0F0A0C 50%, #0A0B0D 100%)"
+    : "radial-gradient(ellipse at 30% 60%, #FFF0F0 0%, #FDF5F5 50%, #FAFAFA 100%)";
+
+  return (
+    <div style={{flex:1, minWidth:0, overflowY:"auto"}}>
+
+      {/* ── HERO STRIP ── */}
+      <div style={{position:"relative"}}>
+        {/* Cover */}
+        <div style={{height:180, background:coverGradient, position:"relative", overflow:"hidden"}}>
+          {/* Subtle texture lines */}
+          <div style={{position:"absolute",inset:0,opacity:0.04}}>
+            {[...Array(8)].map((_,i)=>(
+              <div key={i} style={{position:"absolute",top:`${i*25}%`,left:0,right:0,height:1,background:"var(--fg-primary)"}}/>
+            ))}
+          </div>
+          {/* Accent glow */}
+          <div style={{position:"absolute",bottom:-40,left:60,width:200,height:120,background:"radial-gradient(ellipse,rgba(139,26,47,0.12) 0%,transparent 70%)",borderRadius:"50%"}}/>
+        </div>
+
+        {/* Avatar cutout */}
+        <div style={{
+          position:"absolute", bottom:-48, left:24,
+          padding:4,
+          background:"var(--bg-canvas)",
+          borderRadius:"50%",
+        }}>
+          <Av name="Luiz Felipe" size={88} color="#A31F37"/>
+        </div>
+      </div>
+
+      {/* ── INFO BLOCK + ACTION ROW ── */}
+      <div style={{
+        padding:"60px 24px 0",
+        display:"flex", alignItems:"flex-start", justifyContent:"space-between", gap:12,
+      }}>
+        {/* Left: info */}
+        <div style={{minWidth:0}}>
+          <div style={{display:"flex",alignItems:"baseline",gap:8,flexWrap:"wrap"}}>
+            <h1 style={{font:"700 20px var(--font-ui)",color:"var(--fg-primary)",letterSpacing:"-0.02em"}}>Luiz Felipe</h1>
+            <span style={{font:"400 14px var(--font-mono)",color:"var(--fg-muted)"}}>@{username}</span>
+            <span style={{font:"400 12px var(--font-ui)",color:"var(--fg-muted)"}}>he/him</span>
+          </div>
+          <p style={{font:"400 14px var(--font-ui)",color:"var(--fg-secondary)",marginTop:6,lineHeight:1.5,maxWidth:440}}>
+            Design engineer. Building Componi.
+          </p>
+          <a href="#" style={{display:"inline-flex",alignItems:"center",gap:4,marginTop:6,font:"500 13px var(--font-ui)",color:"var(--accent-hover)",textDecoration:"none"}}
+            onMouseEnter={e=>e.currentTarget.style.opacity="0.8"}
+            onMouseLeave={e=>e.currentTarget.style.opacity="1"}
+          >
+            {IC.externalLink}
+            componi.dev/@{username}
+          </a>
+        </div>
+
+        {/* Right: actions */}
+        <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0,marginTop:4}}>
+          <button
+            onClick={()=>setFollowed(v=>!v)}
+            style={{
+              height:32, padding:"0 16px", borderRadius:6,
+              background: followed ? "var(--accent)" : "transparent",
+              border: `1px solid ${followed ? "var(--accent)" : "var(--border-strong)"}`,
+              color: followed ? "#fff" : "var(--fg-secondary)",
+              font:"600 13px var(--font-ui)",
+              transition:"all 0.14s",
+            }}
+            onMouseEnter={e=>{ if(!followed){ e.currentTarget.style.borderColor="var(--fg-muted)"; e.currentTarget.style.color="var(--fg-primary)"; }}}
+            onMouseLeave={e=>{ if(!followed){ e.currentTarget.style.borderColor="var(--border-strong)"; e.currentTarget.style.color="var(--fg-secondary)"; }}}
+          >{followed?"Following":"Follow"}</button>
+          <button style={{
+            width:32,height:32,borderRadius:6,
+            background:"transparent",border:"1px solid var(--border-strong)",
+            color:"var(--fg-muted)",display:"inline-flex",alignItems:"center",justifyContent:"center",
+            transition:"border-color 0.12s,color 0.12s",
+          }}
+            onMouseEnter={e=>{ e.currentTarget.style.borderColor="var(--fg-muted)"; e.currentTarget.style.color="var(--fg-secondary)"; }}
+            onMouseLeave={e=>{ e.currentTarget.style.borderColor="var(--border-strong)"; e.currentTarget.style.color="var(--fg-muted)"; }}
+          >{IC.more}</button>
+        </div>
+      </div>
+
+      {/* ── METRIC STRIP ── */}
+      <div style={{
+        display:"flex", gap:24, alignItems:"center",
+        padding:"16px 24px",
+        borderBottom:"1px solid var(--border-subtle)",
+        marginTop:16,
+        flexWrap:"wrap",
+      }}>
+        {[
+          { val:"2.1k", label:"Followers" },
+          { val:"340",  label:"Following" },
+          { val:"47",   label:"Components" },
+          { val:"312",  label:"Forks received" },
+        ].map(m=>(
+          <button key={m.label} style={{
+            display:"flex", alignItems:"baseline", gap:5,
+            background:"transparent", border:"none", padding:0,
+            cursor:"pointer",
+          }}
+            onMouseEnter={e=>{ e.currentTarget.querySelector('.metric-label').style.textDecoration="underline"; }}
+            onMouseLeave={e=>{ e.currentTarget.querySelector('.metric-label').style.textDecoration="none"; }}
+          >
+            <span style={{font:"600 16px var(--font-ui)",color:"var(--fg-primary)"}}>{m.val}</span>
+            <span className="metric-label" style={{font:"400 13px var(--font-ui)",color:"var(--fg-muted)",textUnderlineOffset:3,transition:"text-decoration 0.1s"}}>{m.label}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* ── TAB BAR ── */}
+      <div style={{
+        display:"flex", gap:0, alignItems:"center",
+        padding:"0 24px",
+        borderBottom:"1px solid var(--border-subtle)",
+      }}>
+        {TABS.map(tab=>(
+          <button
+            key={tab}
+            onClick={()=>setActiveTab(tab)}
+            style={{
+              height:44, padding:"0 16px",
+              background:"transparent", border:"none",
+              borderBottom: activeTab===tab ? "2px solid var(--accent)" : "2px solid transparent",
+              font:`${activeTab===tab?"600":"400"} 13px var(--font-ui)`,
+              color: activeTab===tab ? "var(--fg-primary)" : "var(--fg-muted)",
+              cursor:"pointer",
+              transition:"color 0.12s, border-color 0.12s",
+              textTransform:"capitalize",
+            }}
+            onMouseEnter={e=>{ if(activeTab!==tab) e.currentTarget.style.color="var(--fg-secondary)"; }}
+            onMouseLeave={e=>{ if(activeTab!==tab) e.currentTarget.style.color="var(--fg-muted)"; }}
+          >{tab}</button>
+        ))}
+      </div>
+
+      {/* ── GRID ── */}
+      <div style={{padding:"20px 24px 48px"}}>
+
+        {/* Tab header */}
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
+          <span style={{font:"500 13px var(--font-ui)",color:"var(--fg-muted)"}}>
+            {isForks ? "9 forks" : "47 components"}
+          </span>
+          <div style={{display:"flex",alignItems:"center",gap:6}}>
+            <select style={{
+              height:28,padding:"0 28px 0 10px",
+              background:"var(--bg-elevated)",
+              border:"1px solid var(--border-subtle)",
+              borderRadius:5,
+              font:"400 12px var(--font-ui)",
+              color:"var(--fg-secondary)",
+              appearance:"none",WebkitAppearance:"none",
+              cursor:"pointer",
+            }}>
+              <option>Most recent</option>
+              <option>Most liked</option>
+              <option>Most forked</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="grid-3">
+          {COMPONENTS.map(item=>(
+            <CompactCard key={item.id} item={item} isForks={isForks} dark={dark} />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─── App ─── */
+function App() {
+  const [tweaks, setTweak] = useTweaks(TWEAK_DEFAULTS);
+
+  const [theme, setTheme]     = useState(tweaks.theme);
+  const [activeTab, setActiveTabState] = useState(tweaks.activeTab);
+  const [followed, setFollowedState]   = useState(tweaks.followed);
+  const username = tweaks.username || "luiz";
+
+  // Sync from tweaks
+  useEffect(()=>{ setTheme(tweaks.theme); document.documentElement.setAttribute("data-theme", tweaks.theme); }, [tweaks.theme]);
+  useEffect(()=>{ setActiveTabState(tweaks.activeTab); }, [tweaks.activeTab]);
+  useEffect(()=>{ setFollowedState(tweaks.followed); }, [tweaks.followed]);
+
+  const toggleTheme = () => {
+    const next = theme==="dark"?"light":"dark";
+    setTheme(next);
+    document.documentElement.setAttribute("data-theme", next);
+    setTweak("theme", next);
+  };
+
+  const setActiveTab = (v) => { setActiveTabState(v); setTweak("activeTab", v); };
+  const setFollowed  = (fn) => {
+    const next = typeof fn === "function" ? fn(followed) : fn;
+    setFollowedState(next);
+    setTweak("followed", next);
+  };
+
+  const mq = window.innerWidth;
+  const isDesktop = mq >= 1024;
+
+  return (
+    <div style={{display:"flex",flexDirection:"column",minHeight:"100vh",background:"var(--bg-canvas)"}}>
+      {isDesktop ? (
+        <div style={{display:"flex",minHeight:"100vh"}}>
+          <LeftSidebar theme={theme} toggleTheme={toggleTheme}/>
+          <div style={{flex:1,display:"flex",flexDirection:"column",minWidth:0}}>
+            <ProfileMain
+              theme={theme}
+              activeTab={activeTab}
+              setActiveTab={setActiveTab}
+              followed={followed}
+              setFollowed={setFollowed}
+              username={username}
+            />
+          </div>
+        </div>
+      ) : (
+        <>
+          <TopBar theme={theme} toggleTheme={toggleTheme} username={username}/>
+          <ProfileMain
+            theme={theme}
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
+            followed={followed}
+            setFollowed={setFollowed}
+            username={username}
+          />
+        </>
+      )}
+
+      <TweaksPanel>
+        <TweakSection label="Theme" />
+        <TweakRadio id="theme" options={["dark","light"]} value={tweaks.theme} onChange={v=>setTweak("theme",v)}/>
+        <TweakSection label="Active Tab" />
+        <TweakRadio id="activeTab" options={["components","likes","forks","collections"]} value={tweaks.activeTab} onChange={v=>setTweak("activeTab",v)}/>
+        <TweakSection label="Social" />
+        <TweakToggle id="followed" label="Following user" value={tweaks.followed} onChange={v=>setTweak("followed",v)}/>
+      </TweaksPanel>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
